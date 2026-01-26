@@ -36,7 +36,6 @@ def get_base64_of_bin_file(bin_file):
     return base64.b64encode(data).decode()
 
 def fetch_weather_data():
-    # 좌표: 울산다운2지구 우미린더시그니처
     lat = 35.5617
     lon = 129.2676
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
@@ -55,24 +54,17 @@ def get_weather_icon(code):
     elif code >= 80: return "⛈️"
     else: return "☁️"
 
-# [핵심] 새로고침 버튼 전용 콜백 함수 (습도 동기화 강화)
 def refresh_data_callback():
     new_data = fetch_weather_data()
     if new_data and 'current' in new_data:
         st.session_state['weather_data'] = new_data
-        
-        # 기상청 최신 데이터 가져오기
         api_temp = float(new_data['current']['temperature_2m'])
         api_hum = float(new_data['current']['relative_humidity_2m'])
-        
-        # [수정] 외부 기온, 습도 입력창 강제 업데이트
         st.session_state['e_temp'] = api_temp
         st.session_state['e_hum'] = api_hum
-        
-        # 알림 메시지 (눈으로 확인 가능)
         st.toast(f"✅ 기상청 동기화 완료! (기온: {api_temp}℃, 습도: {api_hum}%)", icon="📡")
     else:
-        st.toast("⚠️ 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", icon="❌")
+        st.toast("⚠️ 데이터를 불러오지 못했습니다.", icon="❌")
 
 # --- 4. CSS 스타일 ---
 bg_file = "bg.png"
@@ -101,12 +93,7 @@ st.markdown(f"""
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button {{ -webkit-appearance: none; margin: 0; }}
     .weather-row {{ font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
-    
-    /* 버튼 스타일 최적화 (높이 맞춤용) */
-    div.stButton > button {{
-        width: 100%;
-        margin-top: 10px;
-    }}
+    div.stButton > button {{ width: 100%; margin-top: 10px; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -131,21 +118,29 @@ with st.sidebar:
     
     if weather_data and 'daily' in weather_data:
         daily = weather_data['daily']
-        c1, c2, c3 = st.columns([1.2, 1.5, 1.5])
+        # 요일 리스트 정의
+        weekdays = ["(월)", "(화)", "(수)", "(목)", "(금)", "(토)", "(일)"]
+        
+        c1, c2, c3 = st.columns([1.3, 1.5, 1.4]) # [수정] 날짜 컬럼 너비 약간 확보
         c1.markdown("**날짜**")
         c2.markdown("**기온**")
         c3.markdown("**습도/강수**")
         
         for i in range(5):
-            d_date = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d")
+            # 날짜 객체 생성
+            dt = datetime.strptime(daily['time'][i], "%Y-%m-%d")
+            d_date = dt.strftime("%m/%d")
+            d_day = weekdays[dt.weekday()] # 요일 추출
+            
             d_icon = get_weather_icon(daily['weather_code'][i])
             d_min = daily['temperature_2m_min'][i]
             d_max = daily['temperature_2m_max'][i]
             d_hum = daily['relative_humidity_2m_mean'][i]
             d_prob = daily['precipitation_probability_max'][i]
             
-            cols = st.columns([1.2, 1.5, 1.5])
-            cols[0].write(f"{d_date} {d_icon}")
+            cols = st.columns([1.3, 1.5, 1.4])
+            # [수정] 날짜+요일+아이콘 표시
+            cols[0].write(f"{d_date}{d_day} {d_icon}")
             cols[1].write(f"{d_min:.1f}~{d_max:.1f}°")
             
             if d_prob >= 50:
@@ -158,9 +153,17 @@ with st.sidebar:
         st.error("데이터 수신 대기 중")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.link_button("☁️ 기상청 날씨누리 접속", "https://www.weather.go.kr/w/index.do", use_container_width=True)
-    st.divider()
     
+    # 기상청 버튼 (파란색)
+    st.markdown("""
+    <a href="https://www.weather.go.kr/w/index.do" target="_blank" style="text-decoration:none; display:block; width:100%;">
+        <div style="background-color:#0056b3; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            ☁️ 기상청 날씨누리 접속
+        </div>
+    </a>
+    """, unsafe_allow_html=True)
+    
+    st.divider()
     now = datetime.now(pytz.timezone('Asia/Seoul'))
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
@@ -177,10 +180,11 @@ if os.path.exists(logo_file):
 else:
     st.title("Woomi Construction")
 
+# 메인 배너 (연노랑)
 st.markdown("""
-<div style="background-color: rgba(255,255,255,0.85); padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-    <h1 style='margin:0; font-size: 2rem;'>울산다운1차 결로 관리 시스템</h1>
-    <p style='margin:10px 0 0 0; color: #666;'>📡 현장 실시간 기상 데이터를 분석 중입니다.</p>
+<div style="background-color: #fff9db; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #ffeeba;">
+    <h1 style='margin:0; font-size: 2rem; color: #333;'>울산다운1차 결로 관리 시스템</h1>
+    <p style='margin:10px 0 0 0; color: #856404; font-weight: 500;'>📡 현장 실시간 기상 데이터를 분석 중입니다.</p>
 </div>
 """, unsafe_allow_html=True)
 st.divider()
@@ -192,16 +196,14 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown("### 🌡️ 지하 내부")
     st.number_input("표면온도 (℃)", step=0.1, format="%.1f", key='u_temp')
-    st.number_input("내부습도 (%)", step=1.0, format="%.0f", key='u_hum')
+    st.number_input("내부습도 (%)", step=0.5, format="%.1f", key='u_hum')
     st.info("※ 습도계 미설치 시 70% 가정")
 
 with col2:
     st.markdown("### ☁️ 외부 날씨")
-    # key가 지정되어 있으므로 콜백에서 st.session_state['e_hum']을 바꾸면 여기 값도 바뀝니다.
     st.number_input("현재 기온 (℃)", step=0.1, format="%.1f", key='e_temp')
     st.number_input("현재 습도 (%)", step=0.5, format="%.1f", key='e_hum')
     
-    # 버튼 클릭 시 refresh_data_callback 실행
     st.button("🔄 데이터 새로고침", on_click=refresh_data_callback, use_container_width=True)
 
 # 변수 할당
@@ -224,7 +226,6 @@ target_humidity = 70.0
 st.write("")
 st.subheader("📋 실시간 제어 가이드")
 
-# 결과창 박스 스타일
 box_safe = "background-color:#e6fffa;padding:15px;border-radius:10px;"
 box_warn = "background-color:#fff3cd;padding:15px;border-radius:10px;"
 box_danger = "background-color:#ffe6e6;padding:15px;border-radius:10px;"
@@ -260,14 +261,14 @@ else:
             <ul style="margin-bottom:5px;">
                 <li><b>메인 환기</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
                 <li><b>유인휀</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 제습 효율 증대</li>
-                <li><b>제습기</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 내부습도 {underground_hum:.0f}% (높음)</li>
+                <li><b>제습기</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 내부습도 {underground_hum:.1f}% (높음)</li>
             </ul>
             <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffcccc;">
             - 외기 유입 시 결로가 발생하며, 내부도 습하므로 기계 제습이 필요합니다.
         </div>
         """, unsafe_allow_html=True)
     else:
-        # 주의 (절전)
+        # 주의
         st.warning(f"⛔ 환기: OFF  |  🌀 유인휀: OFF  |  ⚡ 제습기: OFF")
         st.markdown(f"""
         <div style="{box_warn}">
@@ -275,7 +276,7 @@ else:
             <ul style="margin-bottom:5px;">
                 <li><b>메인 환기</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
                 <li><b>유인휀</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡전력 절약</li>
-                <li><b>제습기</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡내부습도 {underground_hum:.0f}% (양호)</li>
+                <li><b>제습기</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡내부습도 {underground_hum:.1f}% (양호)</li>
             </ul>
             <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffeeba;">
             - 외기는 습하지만 내부는 양호합니다. 모든 장비를 멈추고 현상을 유지하십시오.
@@ -292,7 +293,6 @@ if weather_data and 'daily' in weather_data:
     t_prob = weather_data['daily']['precipitation_probability_max'][1]
     t_dew = calculate_dew_point(t_max, t_hum)
     
-    # 예보 박스 스타일
     box_forecast = "background-color: rgba(255,255,255,0.9); padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 100%;"
     
     c1, c2 = st.columns([1,2])
