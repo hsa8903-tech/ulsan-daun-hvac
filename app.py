@@ -13,49 +13,63 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. 이미지 처리 함수 ---
+# --- 2. 이미지 처리 함수 (배경/로고용) ---
 def get_base64_of_bin_file(bin_file):
     """이미지 파일을 읽어서 Base64 문자열로 변환"""
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-img_file = "Lynn BI.png"
+# 파일명 설정
+bg_file = "bg.png"       # 배경화면 파일명 (여기에 사진을 넣으세요)
+logo_file = "Lynn BI.png" # 로고 파일명
 
-# --- 3. CSS 스타일 (배경 및 디자인 최적화) ---
-# [수정] 사이드바 강제 너비 설정을 제거하여 모바일 호환성 확보
-bg_css = ""
-if os.path.exists(img_file):
-    bin_str = get_base64_of_bin_file(img_file)
-    bg_css = f"""
-    [data-testid="stAppViewContainer"] > .main::before {{
-         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-         background-image: url("data:image/png;base64,{bin_str}");
-         background-repeat: no-repeat;
-         background-position: bottom right;
-         background-size: 40%;
-         opacity: 0.4;
-         z-index: -1;
-         pointer-events: none;
+# --- 3. CSS 스타일 (배경화면 적용) ---
+css_code = """
+<style>
+/* 숫자 입력창 화살표 제거 */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+"""
+
+# 배경 파일(bg.png)이 있으면 적용, 없으면 통과
+if os.path.exists(bg_file):
+    bin_str = get_base64_of_bin_file(bg_file)
+    css_code += f"""
+    .stApp {{
+        background-image: url("data:image/png;base64,{bin_str}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    /* 배경이 어두울 경우를 대비해 글씨 가독성을 높이는 반투명 박스 스타일 */
+    .stMarkdown, .stText {{
+        /* 필요하면 주석 해제하여 사용하세요 */
+        /* background-color: rgba(255, 255, 255, 0.6); */
+        /* padding: 10px; border-radius: 5px; */
     }}
     """
+else:
+    # 배경 파일이 없을 때 (기존 워터마크 스타일 유지 희망 시)
+    if os.path.exists(logo_file):
+        logo_bin = get_base64_of_bin_file(logo_file)
+        css_code += f"""
+        [data-testid="stAppViewContainer"] > .main::before {{
+             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+             background-image: url("data:image/png;base64,{logo_bin}");
+             background-repeat: no-repeat;
+             background-position: bottom right;
+             background-size: 40%;
+             opacity: 0.1; /* 배경이 없을 땐 연하게 */
+             z-index: -1;
+             pointer-events: none;
+        }}
+        """
 
-st.markdown(
-    f"""
-    <style>
-    [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
-    {bg_css}
-    
-    /* 숫자 입력창 화살표 제거 */
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button {{ -webkit-appearance: none; margin: 0; }}
-    
-    /* [수정] 주간 날씨 텍스트 크기 조정 */
-    .weather-row {{ font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+css_code += "</style>"
+st.markdown(css_code, unsafe_allow_html=True)
+
 
 # --- 4. 날씨 데이터 가져오기 (API) ---
 # 좌표: 울산다운2지구 우미린더시그니처
@@ -85,7 +99,7 @@ if 'weather_data' not in st.session_state:
 weather_data = st.session_state['weather_data']
 
 
-# --- 5. 사이드바 (깔끔한 컬럼형 배치) ---
+# --- 5. 사이드바 (주간날씨) ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
     st.info("""
@@ -97,11 +111,10 @@ with st.sidebar:
     st.divider()
     st.subheader("📅 주간 현장 날씨")
     
-    # [수정] HTML 표 대신 Streamlit 컬럼 사용 (깨짐 방지)
     if weather_data and 'daily' in weather_data:
         daily = weather_data['daily']
         
-        # 헤더 (범례)
+        # 헤더
         c1, c2, c3 = st.columns([1.2, 1.2, 1.5]) 
         c1.markdown("**날짜**")
         c2.markdown("**기온**")
@@ -109,35 +122,24 @@ with st.sidebar:
         
         for i in range(5):
             d_date = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d")
-            d_day = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("(%a)")
             d_icon = get_weather_icon(daily['weather_code'][i])
             d_min = daily['temperature_2m_min'][i]
             d_max = daily['temperature_2m_max'][i]
             d_hum = daily['relative_humidity_2m_mean'][i]
             d_prob = daily['precipitation_probability_max'][i]
             
-            # 한 줄씩 컬럼으로 배치
             cols = st.columns([1.2, 1.2, 1.5])
-            
-            # 1열: 날짜+아이콘
             cols[0].write(f"{d_date} {d_icon}")
-            
-            # 2열: 기온
             cols[1].write(f"{d_min:.0f}~{d_max:.0f}°")
-            
-            # 3열: 습도/강수 (강수확률 높으면 파란색 강조)
             if d_prob >= 50:
                 cols[2].markdown(f"{d_hum:.0f}% <span style='color:blue'>☔{d_prob:.0f}%</span>", unsafe_allow_html=True)
             else:
                 cols[2].write(f"{d_hum:.0f}%")
-            
-            # 구분선 역할 (간격 조절)
             st.markdown("<div style='margin-bottom: 5px; border-bottom: 1px solid #eee;'></div>", unsafe_allow_html=True)
 
     else:
         st.error("데이터 수신 대기 중")
 
-    # 기상청 버튼 (폰트 제거하여 기본 폰트 사용 -> 깨짐 방지)
     st.markdown("""
     <br>
     <a href="https://www.weather.go.kr/w/index.do" target="_blank" style="text-decoration:none;">
@@ -152,11 +154,11 @@ with st.sidebar:
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
 
-# --- 6. 메인 헤더 ---
-if os.path.exists(img_file):
-    logo_bin = get_base64_of_bin_file(img_file)
+# --- 6. 메인 헤더 (로고+텍스트) ---
+if os.path.exists(logo_file):
+    logo_bin = get_base64_of_bin_file(logo_file)
     header_html = f"""
-    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; margin-bottom: 20px; background-color: rgba(255,255,255,0.7); padding: 10px; border-radius: 10px;">
         <img src="data:image/png;base64,{logo_bin}" style="height: 50px; margin-right: 15px;">
         <h2 style="margin: 0; padding-top: 5px; color: #e06000; font-family: sans-serif; letter-spacing: -1px;">
             Woomi Construction
@@ -167,12 +169,12 @@ if os.path.exists(img_file):
 else:
     st.title("Woomi Construction")
 
-st.title("울산다운1차 결로 방지 대시보드")
+st.markdown("<h1 style='background-color: rgba(255,255,255,0.7); padding: 5px; border-radius: 5px;'>울산다운1차 결로 방지 대시보드</h1>", unsafe_allow_html=True)
 st.warning("📡 현장 실시간 기상 데이터를 분석 중입니다.")
 st.divider()
 
 
-# --- 7. 데이터 입력 및 새로고침 ---
+# --- 7. 데이터 입력 및 로직 ---
 if weather_data and 'current' in weather_data:
     api_temp = float(weather_data['current']['temperature_2m'])
     api_hum = float(weather_data['current']['relative_humidity_2m'])
@@ -191,14 +193,13 @@ with col1:
 
 with col2:
     st.markdown("### ☁️ 외부 날씨")
-    if st.button("🔄 데이터 새로고침", help="기상청 최신 데이터로 초기화합니다"):
+    if st.button("🔄 데이터 새로고침"):
         new_data = fetch_weather_data()
         st.session_state['weather_data'] = new_data
         if new_data and 'current' in new_data:
             st.session_state['e_temp'] = float(new_data['current']['temperature_2m'])
             st.session_state['e_hum'] = float(new_data['current']['relative_humidity_2m'])
         st.rerun()
-        
     ext_temp = st.number_input("현재 기온 (℃)", key='e_temp', step=0.1, format="%.1f")
     ext_hum = st.number_input("현재 습도 (%)", key='e_hum', step=0.5, format="%.1f")
 
@@ -215,10 +216,11 @@ safety_margin = 2.0
 st.write("")
 st.subheader("📋 실시간 판정 결과")
 
+# 결과창 가독성을 위해 흰색 배경 박스 추가
 if ext_dew_point >= (underground_temp - safety_margin):
     st.error(f"⛔ 환기 시스템: 정지 (OFF)  |  🌀 유인휀: 가동 (ON)")
     st.markdown(f"""
-    <div style="background-color:#ffe6e6;padding:15px;border-radius:10px;">
+    <div style="background-color:rgba(255, 230, 230, 0.9); padding:15px; border-radius:10px; color:black;">
         <b>[위험] 결로 발생 주의</b><br>
         <ul style="margin-bottom:5px;">
             <li><b>메인 환기(급/배기)</b>: <span style="color:red; font-weight:bold;">가동 중지 (OFF)</span> - 습한 외기 차단</li>
@@ -232,7 +234,7 @@ if ext_dew_point >= (underground_temp - safety_margin):
 else:
     st.success(f"✅ 환기 시스템: 가동 (ON)  |  🌀 유인휀: 가동 (ON)")
     st.markdown(f"""
-    <div style="background-color:#e6fffa;padding:15px;border-radius:10px;">
+    <div style="background-color:rgba(230, 255, 250, 0.9); padding:15px; border-radius:10px; color:black;">
         <b>[안전] 적극 환기 권장</b><br>
         <ul style="margin-bottom:5px;">
             <li><b>메인 환기(급/배기)</b>: <span style="color:green; font-weight:bold;">가동 (ON)</span></li>
@@ -254,22 +256,27 @@ if weather_data and 'daily' in weather_data:
     t_prob = weather_data['daily']['precipitation_probability_max'][1]
     t_dew = calculate_dew_point(t_max, t_hum)
     
+    # 예보 박스도 가독성을 위해 배경 처리
+    box_style = "background-color:rgba(255,255,255,0.8); padding:10px; border-radius:10px;"
+    
     c1, c2 = st.columns([1,2])
     with c1:
         st.info("내일 예상")
-        st.write(f"최고: {t_max:.1f}℃")
-        st.write(f"습도: {t_hum:.1f}%")
-        st.write(f"강수: {t_prob:.0f}%")
-        st.write(f"이슬점: {t_dew:.1f}℃")
+        st.markdown(f"""
+        <div style="{box_style}">
+        최고: {t_max:.1f}℃<br>
+        습도: {t_hum:.1f}%<br>
+        강수: {t_prob:.0f}%<br>
+        이슬점: {t_dew:.1f}℃
+        </div>
+        """, unsafe_allow_html=True)
     with c2:
         if t_dew >= (underground_temp - safety_margin):
             st.warning("⚠️ 내일도 '환기 주의' 예상")
-            st.write("내일도 습하거나 비 소식이 있을 수 있습니다.\n지하 온도를 확인하며 밀폐 관리를 유지하세요.")
+            st.markdown(f"<div style='{box_style}'>내일도 습하거나 비 소식이 있을 수 있습니다.<br>지하 온도를 확인하며 밀폐 관리를 유지하세요.</div>", unsafe_allow_html=True)
         else:
             st.success("🆗 내일은 '적극 환기' 가능")
-            st.write("내일은 비교적 건조할 것으로 예상됩니다.\n오전부터 적극적으로 환기하여 지하를 말리십시오.")
+            st.markdown(f"<div style='{box_style}'>내일은 비교적 건조할 것으로 예상됩니다.<br>오전부터 적극적으로 환기하여 지하를 말리십시오.</div>", unsafe_allow_html=True)
 
 st.divider()
 st.caption("우미건설(주) 울산다운1차 현장 설비팀")
-
-
