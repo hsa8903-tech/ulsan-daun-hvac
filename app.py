@@ -46,11 +46,13 @@ if os.path.exists(img_file):
         unsafe_allow_html=True
     )
 
-# --- 4. 날씨 데이터 가져오기 (다운2지구 좌표) ---
+# --- 4. 날씨 데이터 가져오기 (API) ---
+# 좌표: 울산다운2지구 우미린더시그니처 (데이터 정확도 위해)
 def fetch_weather_data():
-    lat = 35.561  # 다운2지구 위도
-    lon = 129.269 # 다운2지구 경도
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean&timezone=Asia%2FTokyo"
+    lat = 35.5617
+    lon = 129.2676
+    # [수정] precipitation_probability_max (강수확률) 추가 요청
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
     try:
         response = requests.get(url)
         return response.json()
@@ -85,6 +87,7 @@ with st.sidebar:
     st.divider()
     st.subheader("📅 주간 현장 날씨")
     
+    # [수정] 주간 날씨에 '강수확률(☔)' 추가 표시
     if weather_data and 'daily' in weather_data:
         daily = weather_data['daily']
         for i in range(5):
@@ -92,7 +95,23 @@ with st.sidebar:
             d_icon = get_weather_icon(daily['weather_code'][i])
             d_min = daily['temperature_2m_min'][i]
             d_max = daily['temperature_2m_max'][i]
-            st.markdown(f"<div style='font-size:14px; margin-bottom:5px;'>{d_date} {d_icon} <b>{d_min:.1f}° / {d_max:.1f}°</b></div>", unsafe_allow_html=True)
+            d_hum = daily['relative_humidity_2m_mean'][i]       # 습도
+            d_prob = daily['precipitation_probability_max'][i]  # 강수확률
+            
+            # 날짜 | 아이콘 | 최저/최고 | 습도/강수확률
+            # 모바일 화면 고려하여 줄바꿈 배치
+            st.markdown(f"""
+            <div style='font-size:13px; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;'>
+                <div style='display:flex; justify-content:space-between; margin-bottom:2px;'>
+                    <span style='font-weight:bold;'>{d_date} {d_icon}</span>
+                    <span>🌡️ {d_min:.0f}° ~ {d_max:.0f}°</span>
+                </div>
+                <div style='display:flex; justify-content:flex-end; color:#555; font-size:12px;'>
+                    <span style='margin-right:8px;'>💧습도 {d_hum:.0f}%</span>
+                    <span style='color:{'#0066cc' if d_prob >= 50 else '#555'};'>☔강수 {d_prob:.0f}%</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         st.error("데이터 수신 대기 중")
 
@@ -161,7 +180,7 @@ with col2:
     ext_hum = st.number_input("현재 습도 (%)", key='e_hum', step=0.5, format="%.1f")
 
 
-# --- 8. 판정 로직 (유인휀 추가) ---
+# --- 8. 판정 로직 (유인휀 포함) ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -174,8 +193,7 @@ st.write("")
 st.subheader("📋 실시간 판정 결과")
 
 if ext_dew_point >= (underground_temp - safety_margin):
-    # [위험 상황]
-    # 메인 환기: OFF / 유인휀: ON
+    # 위험
     st.error(f"⛔ 환기 시스템: 정지 (OFF)  |  🌀 유인휀: 가동 (ON)")
     st.markdown(f"""
     <div style="background-color:#ffe6e6;padding:15px;border-radius:10px;">
@@ -190,8 +208,7 @@ if ext_dew_point >= (underground_temp - safety_margin):
     </div>
     """, unsafe_allow_html=True)
 else:
-    # [안전 상황]
-    # 메인 환기: ON / 유인휀: ON
+    # 안전
     st.success(f"✅ 환기 시스템: 가동 (ON)  |  🌀 유인휀: 가동 (ON)")
     st.markdown(f"""
     <div style="background-color:#e6fffa;padding:15px;border-radius:10px;">
@@ -207,12 +224,15 @@ else:
     """, unsafe_allow_html=True)
 
 
-# --- 9. 내일 예보 ---
+# --- 9. 내일 예보 (습도/강수확률 포함) ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
     t_max = weather_data['daily']['temperature_2m_max'][1]
     t_hum = weather_data['daily']['relative_humidity_2m_mean'][1]
+    # [수정] 내일 강수확률 추가
+    t_prob = weather_data['daily']['precipitation_probability_max'][1]
+    
     t_dew = calculate_dew_point(t_max, t_hum)
     
     c1, c2 = st.columns([1,2])
@@ -220,14 +240,15 @@ if weather_data and 'daily' in weather_data:
         st.info("내일 예상")
         st.write(f"최고: {t_max:.1f}℃")
         st.write(f"습도: {t_hum:.1f}%")
+        st.write(f"강수확률: {t_prob:.0f}%")
         st.write(f"이슬점: {t_dew:.1f}℃")
     with c2:
         if t_dew >= (underground_temp - safety_margin):
             st.warning("⚠️ 내일도 '환기 주의' 예상")
-            st.write("내일도 습한 공기가 유입될 것으로 보입니다.")
+            st.write("내일도 습하거나 비 소식이 있을 수 있습니다.\n지하 온도를 확인하며 밀폐 관리를 유지하세요.")
         else:
             st.success("🆗 내일은 '적극 환기' 가능")
-            st.write("내일은 공기가 건조하여 환기하기 좋습니다.")
+            st.write("내일은 비교적 건조할 것으로 예상됩니다.\n오전부터 적극적으로 환기하여 지하를 말리십시오.")
 
 st.divider()
 st.caption("우미건설(주) 울산다운1차 현장 설비팀")
