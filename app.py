@@ -55,16 +55,24 @@ def get_weather_icon(code):
     elif code >= 80: return "⛈️"
     else: return "☁️"
 
-# [수정] 새로고침 버튼 전용 콜백 함수 (오류 방지)
+# [핵심] 새로고침 버튼 전용 콜백 함수 (습도 동기화 강화)
 def refresh_data_callback():
     new_data = fetch_weather_data()
-    if new_data:
+    if new_data and 'current' in new_data:
         st.session_state['weather_data'] = new_data
-        if 'current' in new_data:
-            st.session_state['e_temp'] = float(new_data['current']['temperature_2m'])
-            st.session_state['e_hum'] = float(new_data['current']['relative_humidity_2m'])
+        
+        # 기상청 최신 데이터 가져오기
+        api_temp = float(new_data['current']['temperature_2m'])
+        api_hum = float(new_data['current']['relative_humidity_2m'])
+        
+        # [수정] 외부 기온, 습도 입력창 강제 업데이트
+        st.session_state['e_temp'] = api_temp
+        st.session_state['e_hum'] = api_hum
+        
+        # 알림 메시지 (눈으로 확인 가능)
+        st.toast(f"✅ 기상청 동기화 완료! (기온: {api_temp}℃, 습도: {api_hum}%)", icon="📡")
     else:
-        st.toast("데이터를 불러오지 못했습니다.", icon="⚠️")
+        st.toast("⚠️ 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", icon="❌")
 
 # --- 4. CSS 스타일 ---
 bg_file = "bg.png"
@@ -150,11 +158,7 @@ with st.sidebar:
         st.error("데이터 수신 대기 중")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # [수정] 기상청 링크 버튼 (깨짐 방지 및 안정성 확보)
-    # st.link_button은 스트림릿 정식 기능이라 CSS 충돌 없이 깔끔하게 나옵니다.
     st.link_button("☁️ 기상청 날씨누리 접속", "https://www.weather.go.kr/w/index.do", use_container_width=True)
-    
     st.divider()
     
     now = datetime.now(pytz.timezone('Asia/Seoul'))
@@ -182,22 +186,22 @@ st.markdown("""
 st.divider()
 
 
-# --- 8. 데이터 입력 (높이 정렬 유지) ---
+# --- 8. 데이터 입력 ---
 col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("### 🌡️ 지하 내부")
-    # key를 통한 자동 세션 업데이트
     st.number_input("표면온도 (℃)", step=0.1, format="%.1f", key='u_temp')
     st.number_input("내부습도 (%)", step=1.0, format="%.0f", key='u_hum')
     st.info("※ 습도계 미설치 시 70% 가정")
 
 with col2:
     st.markdown("### ☁️ 외부 날씨")
+    # key가 지정되어 있으므로 콜백에서 st.session_state['e_hum']을 바꾸면 여기 값도 바뀝니다.
     st.number_input("현재 기온 (℃)", step=0.1, format="%.1f", key='e_temp')
     st.number_input("현재 습도 (%)", step=0.5, format="%.1f", key='e_hum')
     
-    # [수정] on_click을 사용하여 새로고침 오류 원천 차단
+    # 버튼 클릭 시 refresh_data_callback 실행
     st.button("🔄 데이터 새로고침", on_click=refresh_data_callback, use_container_width=True)
 
 # 변수 할당
