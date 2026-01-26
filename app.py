@@ -22,7 +22,7 @@ def get_base64_of_bin_file(bin_file):
 
 img_file = "Lynn BI.png"
 
-# --- 3. CSS 스타일 (배경 워터마크 + 입력창 정리) ---
+# --- 3. CSS 스타일 ---
 if os.path.exists(img_file):
     bin_str = get_base64_of_bin_file(img_file)
     st.markdown(
@@ -46,8 +46,7 @@ if os.path.exists(img_file):
         unsafe_allow_html=True
     )
 
-# --- 4. 날씨 데이터 가져오기 (API) ---
-# [수정] 좌표는 '다운2지구 우미린더시그니처' 위치 사용
+# --- 4. 날씨 데이터 가져오기 (다운2지구 좌표) ---
 def fetch_weather_data():
     lat = 35.561  # 다운2지구 위도
     lon = 129.269 # 다운2지구 경도
@@ -77,7 +76,6 @@ weather_data = st.session_state['weather_data']
 # --- 5. 사이드바 ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
-    # [수정] 문구는 '울산다운1차' 유지
     st.info("""
     **[PROJECT]**
     **울산다운1차 아파트 건설공사**
@@ -112,7 +110,7 @@ with st.sidebar:
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
 
-# --- 6. 메인 헤더 (로고 + 텍스트 정렬) ---
+# --- 6. 메인 헤더 ---
 if os.path.exists(img_file):
     logo_bin = get_base64_of_bin_file(img_file)
     header_html = f"""
@@ -127,14 +125,12 @@ if os.path.exists(img_file):
 else:
     st.title("Woomi Construction")
 
-# [수정] 타이틀 '울산다운1차' 유지
 st.title("울산다운1차 결로 방지 대시보드")
 st.warning("📡 현장 실시간 기상 데이터를 분석 중입니다.")
 st.divider()
 
 
-# --- 7. 데이터 입력 및 새로고침 로직 ---
-
+# --- 7. 데이터 입력 및 새로고침 ---
 if weather_data and 'current' in weather_data:
     api_temp = float(weather_data['current']['temperature_2m'])
     api_hum = float(weather_data['current']['relative_humidity_2m'])
@@ -165,7 +161,7 @@ with col2:
     ext_hum = st.number_input("현재 습도 (%)", key='e_hum', step=0.5, format="%.1f")
 
 
-# --- 8. 판정 로직 ---
+# --- 8. 판정 로직 (유인휀 추가) ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -178,11 +174,37 @@ st.write("")
 st.subheader("📋 실시간 판정 결과")
 
 if ext_dew_point >= (underground_temp - safety_margin):
-    st.error(f"⛔ 환기 가동 중지 (OFF)")
-    st.markdown(f"<div style='background-color:#ffe6e6;padding:15px;border-radius:10px;'><b>[위험] 결로 발생 주의</b><br>외기 이슬점: <b>{ext_dew_point}℃</b> (지하 {underground_temp}℃와 근접)<br>조치: 밀폐 후 제습기 가동</div>", unsafe_allow_html=True)
+    # [위험 상황]
+    # 메인 환기: OFF / 유인휀: ON
+    st.error(f"⛔ 환기 시스템: 정지 (OFF)  |  🌀 유인휀: 가동 (ON)")
+    st.markdown(f"""
+    <div style="background-color:#ffe6e6;padding:15px;border-radius:10px;">
+        <b>[위험] 결로 발생 주의</b><br>
+        <ul style="margin-bottom:5px;">
+            <li><b>메인 환기(급/배기)</b>: <span style="color:red; font-weight:bold;">가동 중지 (OFF)</span> - 습한 외기 차단</li>
+            <li><b>유인휀(Jet Fan)</b>: <span style="color:blue; font-weight:bold;">가동 (ON)</span> - 내부 공기 순환</li>
+        </ul>
+        <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffcccc;">
+        - 외기 이슬점: <b>{ext_dew_point}℃</b> (지하 {underground_temp}℃와 근접)<br>
+        - 조치: 셔터/창호 밀폐 후 제습기 가동
+    </div>
+    """, unsafe_allow_html=True)
 else:
-    st.success(f"✅ 환기 가동 (ON)")
-    st.markdown(f"<div style='background-color:#e6fffa;padding:15px;border-radius:10px;'><b>[안전] 환기 가능</b><br>외기 이슬점: <b>{ext_dew_point}℃</b> (지하 {underground_temp}℃보다 낮음)<br>조치: 적극 환기 실시</div>", unsafe_allow_html=True)
+    # [안전 상황]
+    # 메인 환기: ON / 유인휀: ON
+    st.success(f"✅ 환기 시스템: 가동 (ON)  |  🌀 유인휀: 가동 (ON)")
+    st.markdown(f"""
+    <div style="background-color:#e6fffa;padding:15px;border-radius:10px;">
+        <b>[안전] 적극 환기 권장</b><br>
+        <ul style="margin-bottom:5px;">
+            <li><b>메인 환기(급/배기)</b>: <span style="color:green; font-weight:bold;">가동 (ON)</span></li>
+            <li><b>유인휀(Jet Fan)</b>: <span style="color:green; font-weight:bold;">가동 (ON)</span></li>
+        </ul>
+        <hr style="margin:10px 0; border: 0; border-top: 1px solid #b3e6c9;">
+        - 외기 이슬점: <b>{ext_dew_point}℃</b> (지하 {underground_temp}℃보다 낮음)<br>
+        - 조치: 급/배기 팬 적극 가동하여 습기 배출
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # --- 9. 내일 예보 ---
