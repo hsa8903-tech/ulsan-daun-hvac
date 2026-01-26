@@ -36,6 +36,7 @@ def get_base64_of_bin_file(bin_file):
     return base64.b64encode(data).decode()
 
 def fetch_weather_data():
+    # 좌표: 울산다운2지구 우미린더시그니처
     lat = 35.5617
     lon = 129.2676
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
@@ -53,6 +54,17 @@ def get_weather_icon(code):
     elif code in [71, 73, 75]: return "❄️"
     elif code >= 80: return "⛈️"
     else: return "☁️"
+
+# [수정] 새로고침 버튼 전용 콜백 함수 (오류 방지)
+def refresh_data_callback():
+    new_data = fetch_weather_data()
+    if new_data:
+        st.session_state['weather_data'] = new_data
+        if 'current' in new_data:
+            st.session_state['e_temp'] = float(new_data['current']['temperature_2m'])
+            st.session_state['e_hum'] = float(new_data['current']['relative_humidity_2m'])
+    else:
+        st.toast("데이터를 불러오지 못했습니다.", icon="⚠️")
 
 # --- 4. CSS 스타일 ---
 bg_file = "bg.png"
@@ -91,8 +103,7 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 
-# --- 5. 데이터 로딩 (에러 발생했던 구간 수정) ---
-# 여기가 에러가 났던 95번째 줄 부근입니다. 완벽하게 수정했습니다.
+# --- 5. 데이터 로딩 ---
 if 'weather_data' not in st.session_state:
     st.session_state['weather_data'] = fetch_weather_data()
 weather_data = st.session_state['weather_data']
@@ -138,7 +149,12 @@ with st.sidebar:
     else:
         st.error("데이터 수신 대기 중")
 
-    st.markdown("""<br><a href="https://www.weather.go.kr/w/index.do" target="_blank" style="text-decoration:none;"><div style="background-color:#0056b3; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold;">☁️ 기상청 날씨누리 접속</div></a>""", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # [수정] 기상청 링크 버튼 (깨짐 방지 및 안정성 확보)
+    # st.link_button은 스트림릿 정식 기능이라 CSS 충돌 없이 깔끔하게 나옵니다.
+    st.link_button("☁️ 기상청 날씨누리 접속", "https://www.weather.go.kr/w/index.do", use_container_width=True)
+    
     st.divider()
     
     now = datetime.now(pytz.timezone('Asia/Seoul'))
@@ -166,31 +182,23 @@ st.markdown("""
 st.divider()
 
 
-# --- 8. 데이터 입력 (열 높이 정렬 수정) ---
+# --- 8. 데이터 입력 (높이 정렬 유지) ---
 col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("### 🌡️ 지하 내부")
-    # 입력창 배치
+    # key를 통한 자동 세션 업데이트
     st.number_input("표면온도 (℃)", step=0.1, format="%.1f", key='u_temp')
     st.number_input("내부습도 (%)", step=1.0, format="%.0f", key='u_hum')
-    # 참고 문구 (하단 배치)
     st.info("※ 습도계 미설치 시 70% 가정")
 
 with col2:
     st.markdown("### ☁️ 외부 날씨")
-    # 입력창 먼저 배치 (왼쪽과 높이 맞춤)
     st.number_input("현재 기온 (℃)", step=0.1, format="%.1f", key='e_temp')
     st.number_input("현재 습도 (%)", step=0.5, format="%.1f", key='e_hum')
     
-    # 버튼을 맨 아래로 이동하여 입력창 높이 정렬
-    if st.button("🔄 데이터 새로고침"):
-        new_data = fetch_weather_data()
-        st.session_state['weather_data'] = new_data
-        if new_data and 'current' in new_data:
-            st.session_state['e_temp'] = float(new_data['current']['temperature_2m'])
-            st.session_state['e_hum'] = float(new_data['current']['relative_humidity_2m'])
-        st.rerun()
+    # [수정] on_click을 사용하여 새로고침 오류 원천 차단
+    st.button("🔄 데이터 새로고침", on_click=refresh_data_callback, use_container_width=True)
 
 # 변수 할당
 underground_temp = st.session_state['u_temp']
@@ -223,7 +231,7 @@ if ext_dew_point < (underground_temp - safety_margin):
     is_vent_safe = True
 
 if is_vent_safe:
-    # 안전 (환기 ON / 유인휀 ON / 제습기 OFF)
+    # 안전
     st.success(f"✅ 환기: ON  |  🌀 유인휀: ON  |  ⚡ 제습기: OFF")
     st.markdown(f"""
     <div style="{box_safe}">
@@ -240,7 +248,7 @@ if is_vent_safe:
 else:
     # 환기 불가
     if underground_hum > target_humidity:
-        # 위험 (내부 습함)
+        # 위험
         st.error(f"⛔ 환기: OFF  |  🌀 유인휀: ON  |  💧 제습기: ON")
         st.markdown(f"""
         <div style="{box_danger}">
@@ -255,7 +263,7 @@ else:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # 주의 (내부 건조, 절전)
+        # 주의 (절전)
         st.warning(f"⛔ 환기: OFF  |  🌀 유인휀: OFF  |  ⚡ 제습기: OFF")
         st.markdown(f"""
         <div style="{box_warn}">
