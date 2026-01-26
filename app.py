@@ -22,47 +22,43 @@ def get_base64_of_bin_file(bin_file):
 
 img_file = "Lynn BI.png"
 
-# --- 3. CSS 스타일 (사이드바 확장 + 디자인) ---
+# --- 3. CSS 스타일 (배경 및 디자인 최적화) ---
+# [수정] 사이드바 강제 너비 설정을 제거하여 모바일 호환성 확보
+bg_css = ""
 if os.path.exists(img_file):
     bin_str = get_base64_of_bin_file(img_file)
-    bg_style = f"""
-        /* 배경 워터마크 */
-        [data-testid="stAppViewContainer"] > .main::before {{
-             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-             background-image: url("data:image/png;base64,{bin_str}");
-             background-repeat: no-repeat;
-             background-position: bottom right;
-             background-size: 40%;
-             opacity: 0.4;
-             z-index: -1;
-             pointer-events: none;
-        }}
+    bg_css = f"""
+    [data-testid="stAppViewContainer"] > .main::before {{
+         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+         background-image: url("data:image/png;base64,{bin_str}");
+         background-repeat: no-repeat;
+         background-position: bottom right;
+         background-size: 40%;
+         opacity: 0.4;
+         z-index: -1;
+         pointer-events: none;
+    }}
     """
-else:
-    bg_style = ""
 
 st.markdown(
     f"""
     <style>
     [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
-    {bg_style}
-    
-    /* [수정] 사이드바 너비 늘리기 (기본보다 넓게 설정) */
-    [data-testid="stSidebar"] {{
-        min-width: 400px;
-        max-width: 450px;
-    }}
+    {bg_css}
     
     /* 숫자 입력창 화살표 제거 */
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button {{ -webkit-appearance: none; margin: 0; }}
+    
+    /* [수정] 주간 날씨 텍스트 크기 조정 */
+    .weather-row {{ font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
     </style>
     """,
     unsafe_allow_html=True
 )
 
 # --- 4. 날씨 데이터 가져오기 (API) ---
-# 좌표: 울산다운2지구 우미린더시그니처 (데이터는 여기, 표기는 1차)
+# 좌표: 울산다운2지구 우미린더시그니처
 def fetch_weather_data():
     lat = 35.5617
     lon = 129.2676
@@ -89,7 +85,7 @@ if 'weather_data' not in st.session_state:
 weather_data = st.session_state['weather_data']
 
 
-# --- 5. 사이드바 (표 적용) ---
+# --- 5. 사이드바 (깔끔한 컬럼형 배치) ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
     st.info("""
@@ -101,58 +97,51 @@ with st.sidebar:
     st.divider()
     st.subheader("📅 주간 현장 날씨")
     
-    # [수정] 주간 날씨를 '표(Table)' 형태로 변환
+    # [수정] HTML 표 대신 Streamlit 컬럼 사용 (깨짐 방지)
     if weather_data and 'daily' in weather_data:
         daily = weather_data['daily']
         
-        # HTML 테이블 시작
-        table_html = """
-        <table style="width:100%; font-size:13px; text-align:center; border-collapse: collapse; color:#333;">
-          <thead>
-            <tr style="background-color:#f0f2f6; border-bottom:2px solid #ddd;">
-              <th style="padding:6px; white-space:nowrap;">날짜</th>
-              <th style="padding:6px; white-space:nowrap;">날씨</th>
-              <th style="padding:6px; white-space:nowrap;">기온</th>
-              <th style="padding:6px; white-space:nowrap;">습도</th>
-              <th style="padding:6px; white-space:nowrap;">강수</th>
-            </tr>
-          </thead>
-          <tbody>
-        """
+        # 헤더 (범례)
+        c1, c2, c3 = st.columns([1.2, 1.2, 1.5]) 
+        c1.markdown("**날짜**")
+        c2.markdown("**기온**")
+        c3.markdown("**습도/강수**")
         
         for i in range(5):
             d_date = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d")
-            d_day = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("(%a)") # 요일
+            d_day = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("(%a)")
             d_icon = get_weather_icon(daily['weather_code'][i])
             d_min = daily['temperature_2m_min'][i]
             d_max = daily['temperature_2m_max'][i]
             d_hum = daily['relative_humidity_2m_mean'][i]
             d_prob = daily['precipitation_probability_max'][i]
             
-            # 강수확률 색상 강조 (50% 이상 파란색)
-            prob_color = "#0066cc; font-weight:bold;" if d_prob >= 50 else "#888;"
+            # 한 줄씩 컬럼으로 배치
+            cols = st.columns([1.2, 1.2, 1.5])
+            
+            # 1열: 날짜+아이콘
+            cols[0].write(f"{d_date} {d_icon}")
+            
+            # 2열: 기온
+            cols[1].write(f"{d_min:.0f}~{d_max:.0f}°")
+            
+            # 3열: 습도/강수 (강수확률 높으면 파란색 강조)
+            if d_prob >= 50:
+                cols[2].markdown(f"{d_hum:.0f}% <span style='color:blue'>☔{d_prob:.0f}%</span>", unsafe_allow_html=True)
+            else:
+                cols[2].write(f"{d_hum:.0f}%")
+            
+            # 구분선 역할 (간격 조절)
+            st.markdown("<div style='margin-bottom: 5px; border-bottom: 1px solid #eee;'></div>", unsafe_allow_html=True)
 
-            # 테이블 행 추가
-            table_html += f"""
-            <tr style="border-bottom:1px solid #eee;">
-              <td style="padding:6px;">{d_date}<br><span style="font-size:11px; color:#666;">{d_day}</span></td>
-              <td style="padding:6px; font-size:16px;">{d_icon}</td>
-              <td style="padding:6px;">{d_min:.0f}~{d_max:.0f}°</td>
-              <td style="padding:6px;">{d_hum:.0f}%</td>
-              <td style="padding:6px; color:{prob_color}">{d_prob:.0f}%</td>
-            </tr>
-            """
-        
-        table_html += "</tbody></table>"
-        st.markdown(table_html, unsafe_allow_html=True)
-        
     else:
         st.error("데이터 수신 대기 중")
 
+    # 기상청 버튼 (폰트 제거하여 기본 폰트 사용 -> 깨짐 방지)
     st.markdown("""
     <br>
     <a href="https://www.weather.go.kr/w/index.do" target="_blank" style="text-decoration:none;">
-        <div style="background-color:#0056b3; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; font-family:'Malgun Gothic', sans-serif;">
+        <div style="background-color:#0056b3; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold;">
             ☁️ 기상청 날씨누리 접속
         </div>
     </a>
@@ -256,7 +245,7 @@ else:
     """, unsafe_allow_html=True)
 
 
-# --- 9. 내일 예보 (표시 개선) ---
+# --- 9. 내일 예보 ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
