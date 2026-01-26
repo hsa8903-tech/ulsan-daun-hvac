@@ -22,13 +22,11 @@ def get_base64_of_bin_file(bin_file):
 
 img_file = "Lynn BI.png"
 
-# --- 3. CSS 스타일 ---
+# --- 3. CSS 스타일 (사이드바 확장 + 디자인) ---
 if os.path.exists(img_file):
     bin_str = get_base64_of_bin_file(img_file)
-    st.markdown(
-        f"""
-        <style>
-        [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
+    bg_style = f"""
+        /* 배경 워터마크 */
         [data-testid="stAppViewContainer"] > .main::before {{
              content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
              background-image: url("data:image/png;base64,{bin_str}");
@@ -39,19 +37,35 @@ if os.path.exists(img_file):
              z-index: -1;
              pointer-events: none;
         }}
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button {{ -webkit-appearance: none; margin: 0; }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    """
+else:
+    bg_style = ""
+
+st.markdown(
+    f"""
+    <style>
+    [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
+    {bg_style}
+    
+    /* [수정] 사이드바 너비 늘리기 (기본보다 넓게 설정) */
+    [data-testid="stSidebar"] {{
+        min-width: 400px;
+        max-width: 450px;
+    }}
+    
+    /* 숫자 입력창 화살표 제거 */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button {{ -webkit-appearance: none; margin: 0; }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- 4. 날씨 데이터 가져오기 (API) ---
-# 좌표: 울산다운2지구 우미린더시그니처 (데이터 정확도 위해)
+# 좌표: 울산다운2지구 우미린더시그니처 (데이터는 여기, 표기는 1차)
 def fetch_weather_data():
     lat = 35.5617
     lon = 129.2676
-    # [수정] precipitation_probability_max (강수확률) 추가 요청
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
     try:
         response = requests.get(url)
@@ -75,7 +89,7 @@ if 'weather_data' not in st.session_state:
 weather_data = st.session_state['weather_data']
 
 
-# --- 5. 사이드바 ---
+# --- 5. 사이드바 (표 적용) ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
     st.info("""
@@ -87,31 +101,51 @@ with st.sidebar:
     st.divider()
     st.subheader("📅 주간 현장 날씨")
     
-    # [수정] 주간 날씨에 '강수확률(☔)' 추가 표시
+    # [수정] 주간 날씨를 '표(Table)' 형태로 변환
     if weather_data and 'daily' in weather_data:
         daily = weather_data['daily']
+        
+        # HTML 테이블 시작
+        table_html = """
+        <table style="width:100%; font-size:13px; text-align:center; border-collapse: collapse; color:#333;">
+          <thead>
+            <tr style="background-color:#f0f2f6; border-bottom:2px solid #ddd;">
+              <th style="padding:6px; white-space:nowrap;">날짜</th>
+              <th style="padding:6px; white-space:nowrap;">날씨</th>
+              <th style="padding:6px; white-space:nowrap;">기온</th>
+              <th style="padding:6px; white-space:nowrap;">습도</th>
+              <th style="padding:6px; white-space:nowrap;">강수</th>
+            </tr>
+          </thead>
+          <tbody>
+        """
+        
         for i in range(5):
-            d_date = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d(%a)")
+            d_date = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d")
+            d_day = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("(%a)") # 요일
             d_icon = get_weather_icon(daily['weather_code'][i])
             d_min = daily['temperature_2m_min'][i]
             d_max = daily['temperature_2m_max'][i]
-            d_hum = daily['relative_humidity_2m_mean'][i]       # 습도
-            d_prob = daily['precipitation_probability_max'][i]  # 강수확률
+            d_hum = daily['relative_humidity_2m_mean'][i]
+            d_prob = daily['precipitation_probability_max'][i]
             
-            # 날짜 | 아이콘 | 최저/최고 | 습도/강수확률
-            # 모바일 화면 고려하여 줄바꿈 배치
-            st.markdown(f"""
-            <div style='font-size:13px; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;'>
-                <div style='display:flex; justify-content:space-between; margin-bottom:2px;'>
-                    <span style='font-weight:bold;'>{d_date} {d_icon}</span>
-                    <span>🌡️ {d_min:.0f}° ~ {d_max:.0f}°</span>
-                </div>
-                <div style='display:flex; justify-content:flex-end; color:#555; font-size:12px;'>
-                    <span style='margin-right:8px;'>💧습도 {d_hum:.0f}%</span>
-                    <span style='color:{'#0066cc' if d_prob >= 50 else '#555'};'>☔강수 {d_prob:.0f}%</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            # 강수확률 색상 강조 (50% 이상 파란색)
+            prob_color = "#0066cc; font-weight:bold;" if d_prob >= 50 else "#888;"
+
+            # 테이블 행 추가
+            table_html += f"""
+            <tr style="border-bottom:1px solid #eee;">
+              <td style="padding:6px;">{d_date}<br><span style="font-size:11px; color:#666;">{d_day}</span></td>
+              <td style="padding:6px; font-size:16px;">{d_icon}</td>
+              <td style="padding:6px;">{d_min:.0f}~{d_max:.0f}°</td>
+              <td style="padding:6px;">{d_hum:.0f}%</td>
+              <td style="padding:6px; color:{prob_color}">{d_prob:.0f}%</td>
+            </tr>
+            """
+        
+        table_html += "</tbody></table>"
+        st.markdown(table_html, unsafe_allow_html=True)
+        
     else:
         st.error("데이터 수신 대기 중")
 
@@ -180,7 +214,7 @@ with col2:
     ext_hum = st.number_input("현재 습도 (%)", key='e_hum', step=0.5, format="%.1f")
 
 
-# --- 8. 판정 로직 (유인휀 포함) ---
+# --- 8. 판정 로직 ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -193,7 +227,6 @@ st.write("")
 st.subheader("📋 실시간 판정 결과")
 
 if ext_dew_point >= (underground_temp - safety_margin):
-    # 위험
     st.error(f"⛔ 환기 시스템: 정지 (OFF)  |  🌀 유인휀: 가동 (ON)")
     st.markdown(f"""
     <div style="background-color:#ffe6e6;padding:15px;border-radius:10px;">
@@ -208,7 +241,6 @@ if ext_dew_point >= (underground_temp - safety_margin):
     </div>
     """, unsafe_allow_html=True)
 else:
-    # 안전
     st.success(f"✅ 환기 시스템: 가동 (ON)  |  🌀 유인휀: 가동 (ON)")
     st.markdown(f"""
     <div style="background-color:#e6fffa;padding:15px;border-radius:10px;">
@@ -224,15 +256,13 @@ else:
     """, unsafe_allow_html=True)
 
 
-# --- 9. 내일 예보 (습도/강수확률 포함) ---
+# --- 9. 내일 예보 (표시 개선) ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
     t_max = weather_data['daily']['temperature_2m_max'][1]
     t_hum = weather_data['daily']['relative_humidity_2m_mean'][1]
-    # [수정] 내일 강수확률 추가
     t_prob = weather_data['daily']['precipitation_probability_max'][1]
-    
     t_dew = calculate_dew_point(t_max, t_hum)
     
     c1, c2 = st.columns([1,2])
@@ -240,7 +270,7 @@ if weather_data and 'daily' in weather_data:
         st.info("내일 예상")
         st.write(f"최고: {t_max:.1f}℃")
         st.write(f"습도: {t_hum:.1f}%")
-        st.write(f"강수확률: {t_prob:.0f}%")
+        st.write(f"강수: {t_prob:.0f}%")
         st.write(f"이슬점: {t_dew:.1f}℃")
     with c2:
         if t_dew >= (underground_temp - safety_margin):
