@@ -1,4 +1,28 @@
 import streamlit as st
+import base64
+
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read())
+    
+    st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url(data:image/png;base64,{encoded_string.decode()});
+        background-size: cover;      /* 화면 꽉 차게 */
+        background-position: center; /* 중앙 정렬 */
+        background-repeat: no-repeat;
+        background-attachment: fixed; /* 스크롤 해도 배경 고정 */
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+    )
+
+# --- 여기 파일 이름만 바꾸면 됩니다 ---
+add_bg_from_local('bg.png')
+import streamlit as st
 import math
 import requests
 from datetime import datetime
@@ -271,3 +295,4 @@ if weather_data and 'daily' in weather_data:
 
 st.divider()
 st.caption("우미건설(주) 울산다운1차 현장 설비팀")
+
