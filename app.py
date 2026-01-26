@@ -8,72 +8,49 @@ import os
 
 # --- 1. 앱 기본 설정 ---
 st.set_page_config(
-    page_title="울산다운2지구 우미린 결로관리",
+    page_title="울산다운1차 결로관리",
     page_icon="🏗️",
     layout="centered"
 )
 
-# --- 2. 이미지 로딩 및 배경 설정 (핵심) ---
+# --- 2. 이미지 처리 함수 ---
 def get_base64_of_bin_file(bin_file):
     """이미지 파일을 읽어서 Base64 문자열로 변환"""
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-# 업로드하신 파일명 그대로 사용
 img_file = "Lynn BI.png"
 
+# --- 3. CSS 스타일 (배경 워터마크 + 입력창 정리) ---
 if os.path.exists(img_file):
-    # 1) 배경 워터마크 적용 (CSS)
     bin_str = get_base64_of_bin_file(img_file)
     st.markdown(
         f"""
         <style>
-        /* 메인 화면 컨테이너 */
-        [data-testid="stAppViewContainer"] > .main {{
-             position: relative;
-        }}
-        /* 가상요소(::before)를 사용하여 배경 이미지만 투명도 조절 */
+        [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
         [data-testid="stAppViewContainer"] > .main::before {{
-             content: "";
-             position: absolute;
-             top: 0;
-             left: 0;
-             width: 100%;
-             height: 100%;
-             
-             /* 배경 이미지 설정 */
+             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
              background-image: url("data:image/png;base64,{bin_str}");
              background-repeat: no-repeat;
-             background-position: bottom right; /* 우측 하단 배치 */
-             background-size: 40%; /* 크기 조절 (화면의 40% 크기) */
-             
-             /* 투명도 및 레이어 설정 */
-             opacity: 0.4; /* 선명도 40% */
-             z-index: -1; /* 글자 뒤로 보내기 */
+             background-position: bottom right;
+             background-size: 40%;
+             opacity: 0.4;
+             z-index: -1;
              pointer-events: none;
         }}
-        
-        /* 숫자 입력창 화살표 제거 (디자인 깔끔하게) */
         input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button {{ 
-          -webkit-appearance: none; 
-          margin: 0; 
-        }}
+        input[type=number]::-webkit-outer-spin-button {{ -webkit-appearance: none; margin: 0; }}
         </style>
         """,
         unsafe_allow_html=True
     )
-else:
-    # 파일이 아직 안 올라갔을 때 안내
-    st.toast("⚠️ 'Lynn BI.png' 파일을 GitHub에 올려주세요.", icon="FILE")
 
-
-# --- 3. 날씨 데이터 (Open-Meteo API / 다운2지구) ---
-@st.cache_data(ttl=3600)
-def get_weather_data():
-    lat = 35.561 
-    lon = 129.269
+# --- 4. 날씨 데이터 가져오기 (API) ---
+# [수정] 좌표는 '다운2지구 우미린더시그니처' 위치 사용
+def fetch_weather_data():
+    lat = 35.561  # 다운2지구 위도
+    lon = 129.269 # 다운2지구 경도
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean&timezone=Asia%2FTokyo"
     try:
         response = requests.get(url)
@@ -90,16 +67,20 @@ def get_weather_icon(code):
     elif code >= 80: return "⛈️"
     else: return "☁️"
 
-weather_data = get_weather_data()
+# 데이터 초기 로딩 또는 새로고침
+if 'weather_data' not in st.session_state:
+    st.session_state['weather_data'] = fetch_weather_data()
+
+weather_data = st.session_state['weather_data']
 
 
-# --- 4. 사이드바 설정 ---
+# --- 5. 사이드바 ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
+    # [수정] 문구는 '울산다운1차' 유지
     st.info("""
     **[PROJECT]**
-    **울산다운2지구 우미린**
-    **더시그니처 아파트 건설공사**
+    **울산다운1차 아파트 건설공사**
     * **위치:** 울산 중구 다운동
     * **시공:** 우미건설(주)
     """)
@@ -115,51 +96,76 @@ with st.sidebar:
             d_max = daily['temperature_2m_max'][i]
             st.markdown(f"<div style='font-size:14px; margin-bottom:5px;'>{d_date} {d_icon} <b>{d_min:.1f}° / {d_max:.1f}°</b></div>", unsafe_allow_html=True)
     else:
-        st.error("날씨 정보 수신 대기 중")
+        st.error("데이터 수신 대기 중")
 
-    st.markdown("<br><a href='https://www.weather.go.kr/w/index.do' target='_blank'><div style='background:#0056b3;color:white;padding:10px;border-radius:5px;text-align:center;'>☁️ 기상청 바로가기</div></a>", unsafe_allow_html=True)
+    st.markdown("""
+    <br>
+    <a href="https://www.weather.go.kr/w/index.do" target="_blank" style="text-decoration:none;">
+        <div style="background-color:#0056b3; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; font-family:'Malgun Gothic', sans-serif;">
+            ☁️ 기상청 날씨누리 접속
+        </div>
+    </a>
+    """, unsafe_allow_html=True)
     
     st.divider()
     now = datetime.now(pytz.timezone('Asia/Seoul'))
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
 
-# --- 5. 메인 헤더 (로고 + 타이틀) ---
-col_h1, col_h2 = st.columns([1, 5])
+# --- 6. 메인 헤더 (로고 + 텍스트 정렬) ---
+if os.path.exists(img_file):
+    logo_bin = get_base64_of_bin_file(img_file)
+    header_html = f"""
+    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <img src="data:image/png;base64,{logo_bin}" style="height: 50px; margin-right: 15px;">
+        <h2 style="margin: 0; padding-top: 5px; color: #e06000; font-family: sans-serif; letter-spacing: -1px;">
+            Woomi Construction
+        </h2>
+    </div>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
+else:
+    st.title("Woomi Construction")
 
-with col_h1:
-    # 2) 상단 로고 이미지 (파일이 있으면 표시)
-    if os.path.exists(img_file):
-        st.image(img_file, width=100) # 로고 크기 조절
-    else:
-        st.write("Logo")
-
-with col_h2:
-    st.markdown("<h2 style='margin-top:10px; color:#e06000;'>Woomi Construction</h2>", unsafe_allow_html=True) # 린 로고색(주황) 반영
-
-st.title("울산다운2지구 결로 방지 대시보드")
+# [수정] 타이틀 '울산다운1차' 유지
+st.title("울산다운1차 결로 방지 대시보드")
 st.warning("📡 현장 실시간 기상 데이터를 분석 중입니다.")
 st.divider()
 
 
-# --- 6. 데이터 입력 (소수점 1자리) ---
+# --- 7. 데이터 입력 및 새로고침 로직 ---
+
 if weather_data and 'current' in weather_data:
-    init_temp = float(weather_data['current']['temperature_2m'])
-    init_hum = float(weather_data['current']['relative_humidity_2m'])
+    api_temp = float(weather_data['current']['temperature_2m'])
+    api_hum = float(weather_data['current']['relative_humidity_2m'])
 else:
-    init_temp, init_hum = 25.0, 70.0
+    api_temp, api_hum = 25.0, 70.0
+
+if 'u_temp' not in st.session_state: st.session_state['u_temp'] = 18.5
+if 'e_temp' not in st.session_state: st.session_state['e_temp'] = api_temp
+if 'e_hum' not in st.session_state: st.session_state['e_hum'] = api_hum
 
 col1, col2 = st.columns(2)
+
 with col1:
     st.markdown("### 🌡️ 지하 내부")
-    underground_temp = st.slider("표면온도 (℃)", 0.0, 35.0, 18.5, step=0.1, format="%.1f")
+    underground_temp = st.slider("표면온도 (℃)", 0.0, 35.0, key='u_temp', step=0.1, format="%.1f")
+
 with col2:
     st.markdown("### ☁️ 외부 날씨")
-    ext_temp = st.number_input("현재 기온 (℃)", value=init_temp, step=0.1, format="%.1f")
-    ext_hum = st.number_input("현재 습도 (%)", value=init_hum, step=0.5, format="%.1f")
+    if st.button("🔄 데이터 새로고침", help="기상청 최신 데이터로 초기화합니다"):
+        new_data = fetch_weather_data()
+        st.session_state['weather_data'] = new_data
+        if new_data and 'current' in new_data:
+            st.session_state['e_temp'] = float(new_data['current']['temperature_2m'])
+            st.session_state['e_hum'] = float(new_data['current']['relative_humidity_2m'])
+        st.rerun()
+        
+    ext_temp = st.number_input("현재 기온 (℃)", key='e_temp', step=0.1, format="%.1f")
+    ext_hum = st.number_input("현재 습도 (%)", key='e_hum', step=0.5, format="%.1f")
 
 
-# --- 7. 판정 로직 (Magnus Formula) ---
+# --- 8. 판정 로직 ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -179,7 +185,7 @@ else:
     st.markdown(f"<div style='background-color:#e6fffa;padding:15px;border-radius:10px;'><b>[안전] 환기 가능</b><br>외기 이슬점: <b>{ext_dew_point}℃</b> (지하 {underground_temp}℃보다 낮음)<br>조치: 적극 환기 실시</div>", unsafe_allow_html=True)
 
 
-# --- 8. 내일 예보 ---
+# --- 9. 내일 예보 ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
@@ -202,4 +208,4 @@ if weather_data and 'daily' in weather_data:
             st.write("내일은 공기가 건조하여 환기하기 좋습니다.")
 
 st.divider()
-st.caption("우미건설(주) 울산다운2지구 우미린더시그니처 현장 설비팀")
+st.caption("우미건설(주) 울산다운1차 현장 설비팀")
