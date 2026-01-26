@@ -5,11 +5,21 @@ from datetime import datetime
 import pytz
 import base64
 import os
+from PIL import Image
 
 # --- 1. 앱 기본 설정 ---
+# 아이콘 설정
+icon_file = "Lynn BI.png"
+page_icon = "🏗️"
+if os.path.exists(icon_file):
+    try:
+        page_icon = Image.open(icon_file)
+    except:
+        pass
+
 st.set_page_config(
-    page_title="울산다운1차 결로관리",
-    page_icon="🏗️",
+    page_title="울산다운1차 결로관리", # 브라우저 탭 이름
+    page_icon=page_icon,
     layout="centered"
 )
 
@@ -20,7 +30,8 @@ def get_base64_of_bin_file(bin_file):
         data = f.read()
     return base64.b64encode(data).decode()
 
-img_file = "Lynn BI.png"
+bg_file = "bg.png"       
+logo_file = "Lynn BI.png" 
 
 # --- 3. CSS 스타일 ---
 bg_css = ""
@@ -100,7 +111,7 @@ with st.sidebar:
         daily = weather_data['daily']
         
         # 헤더
-        c1, c2, c3 = st.columns([1.2, 1.2, 1.5]) 
+        c1, c2, c3 = st.columns([1.2, 1.5, 1.5]) # 기온 컬럼 너비 확보
         c1.markdown("**날짜**")
         c2.markdown("**기온**")
         c3.markdown("**습도/강수**")
@@ -113,9 +124,10 @@ with st.sidebar:
             d_hum = daily['relative_humidity_2m_mean'][i]
             d_prob = daily['precipitation_probability_max'][i]
             
-            cols = st.columns([1.2, 1.2, 1.5])
+            cols = st.columns([1.2, 1.5, 1.5])
             cols[0].write(f"{d_date} {d_icon}")
-            cols[1].write(f"{d_min:.0f}~{d_max:.0f}°")
+            # [수정] 소수점 1자리 표기 (:.1f)
+            cols[1].write(f"{d_min:.1f}~{d_max:.1f}°")
             
             if d_prob >= 50:
                 cols[2].markdown(f"{d_hum:.0f}% <span style='color:blue'>☔{d_prob:.0f}%</span>", unsafe_allow_html=True)
@@ -142,10 +154,10 @@ with st.sidebar:
 
 
 # --- 6. 메인 헤더 ---
-if os.path.exists(img_file):
-    logo_bin = get_base64_of_bin_file(img_file)
+if os.path.exists(logo_file):
+    logo_bin = get_base64_of_bin_file(logo_file)
     header_html = f"""
-    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; margin-bottom: 20px; background-color: rgba(255,255,255,0.85); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
         <img src="data:image/png;base64,{logo_bin}" style="height: 50px; margin-right: 15px;">
         <h2 style="margin: 0; padding-top: 5px; color: #e06000; font-family: sans-serif; letter-spacing: -1px;">
             Woomi Construction
@@ -156,12 +168,17 @@ if os.path.exists(img_file):
 else:
     st.title("Woomi Construction")
 
-st.title("울산다운1차 결로 방지 대시보드")
-st.warning("📡 현장 실시간 기상 데이터를 분석 중입니다.")
+# [수정] 타이틀 변경: 결로 관리 시스템
+st.markdown("""
+<div style="background-color: rgba(255,255,255,0.85); padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+    <h1 style='margin:0; font-size: 2rem;'>울산다운1차 결로 관리 시스템</h1>
+    <p style='margin:10px 0 0 0; color: #666;'>📡 현장 실시간 기상 데이터를 분석 중입니다.</p>
+</div>
+""", unsafe_allow_html=True)
 st.divider()
 
 
-# --- 7. 데이터 입력 (내부습도 슬라이더 추가) ---
+# --- 7. 데이터 입력 (내부 표기 수정) ---
 if weather_data and 'current' in weather_data:
     api_temp = float(weather_data['current']['temperature_2m'])
     api_hum = float(weather_data['current']['relative_humidity_2m'])
@@ -169,7 +186,6 @@ else:
     api_temp, api_hum = 25.0, 70.0
 
 if 'u_temp' not in st.session_state: st.session_state['u_temp'] = 18.5
-# [추가] 내부습도 초기값 설정
 if 'u_hum' not in st.session_state: st.session_state['u_hum'] = 60.0 
 if 'e_temp' not in st.session_state: st.session_state['e_temp'] = api_temp
 if 'e_hum' not in st.session_state: st.session_state['e_hum'] = api_hum
@@ -178,9 +194,14 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("### 🌡️ 지하 내부")
-    underground_temp = st.slider("표면온도 (℃)", 0.0, 35.0, key='u_temp', step=0.1, format="%.1f")
-    # [추가] 내부습도 슬라이더
-    underground_hum = st.slider("내부습도 (%)", 0.0, 100.0, key='u_hum', step=1.0, format="%.0f")
+    # [수정] 슬라이더 제거 -> 외부 날씨와 동일한 숫자 입력창(Number Input)으로 변경
+    underground_temp = st.number_input("표면온도 (℃)", value=st.session_state['u_temp'], step=0.1, format="%.1f", key='u_temp_input')
+    underground_hum = st.number_input("내부습도 (%)", value=st.session_state['u_hum'], step=1.0, format="%.0f", key='u_hum_input')
+    
+    # 세션 스테이트 업데이트 (입력값 유지)
+    st.session_state['u_temp'] = underground_temp
+    st.session_state['u_hum'] = underground_hum
+    
     st.caption("※ 습도계가 없다면 70%로 설정하세요.")
 
 with col2:
@@ -197,7 +218,7 @@ with col2:
     ext_hum = st.number_input("현재 습도 (%)", key='e_hum', step=0.5, format="%.1f")
 
 
-# --- 8. 판정 로직 (에너지 절약 모드 적용) ---
+# --- 8. 판정 로직 (유인휀 추가) ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -205,7 +226,7 @@ def calculate_dew_point(temp, hum):
 
 ext_dew_point = calculate_dew_point(ext_temp, ext_hum)
 safety_margin = 2.0
-target_humidity = 70.0 # 제습기 가동 기준 (70% 초과 시 가동)
+target_humidity = 70.0 
 
 st.write("")
 st.subheader("📋 실시간 제어 가이드")
@@ -217,13 +238,15 @@ if ext_dew_point < (underground_temp - safety_margin):
 
 # 2. 결과 출력
 if is_vent_safe:
-    # [상황 1] 환기 가능 -> 환기 ON / 제습기 OFF (전기 절약)
-    st.success(f"✅ 환기: 가동 (ON)  |  ⚡ 제습기: 정지 (OFF)")
+    # [상황 1] 환기 가능 -> 환기 ON / 유인휀 ON / 제습기 OFF
+    # [수정] 유인휀 표시 추가
+    st.success(f"✅ 환기: ON  |  🌀 유인휀: ON  |  ⚡ 제습기: OFF")
     st.markdown(f"""
     <div style="background-color:#e6fffa;padding:15px;border-radius:10px;">
         <b>[안전] 적극 환기 (에너지 절약)</b><br>
         <ul style="margin-bottom:5px;">
-            <li><b>메인 환기(급/배기)</b>: <span style="color:green; font-weight:bold;">ON (가동)</span> - 외기로 건조</li>
+            <li><b>메인 환기</b>: <span style="color:green; font-weight:bold;">ON (가동)</span> - 외기로 건조</li>
+            <li><b>유인휀</b>: <span style="color:green; font-weight:bold;">ON (가동)</span> - 공기 순환</li>
             <li><b>제습기</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡불필요한 전력 낭비 방지</li>
         </ul>
         <hr style="margin:10px 0; border: 0; border-top: 1px solid #b3e6c9;">
@@ -232,15 +255,17 @@ if is_vent_safe:
     """, unsafe_allow_html=True)
 
 else:
-    # [상황 2] 환기 불가 -> 내부 습도에 따라 제습기 결정
+    # [상황 2] 환기 불가
     if underground_hum > target_humidity:
-        # [2-A] 내부 습함 -> 제습기 ON
-        st.error(f"⛔ 환기: 정지 (OFF)  |  💧 제습기: 가동 (ON)")
+        # [2-A] 내부 습함 -> 환기 OFF / 유인휀 ON / 제습기 ON
+        # [수정] 유인휀 표시 추가 (제습 효율 위해 가동)
+        st.error(f"⛔ 환기: OFF  |  🌀 유인휀: ON  |  💧 제습기: ON")
         st.markdown(f"""
         <div style="background-color:#ffe6e6;padding:15px;border-radius:10px;">
             <b>[위험] 밀폐 및 강제 제습</b><br>
             <ul style="margin-bottom:5px;">
-                <li><b>메인 환기(급/배기)</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
+                <li><b>메인 환기</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
+                <li><b>유인휀</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 제습 효율 증대</li>
                 <li><b>제습기</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 내부습도 {underground_hum:.0f}% (높음)</li>
             </ul>
             <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffcccc;">
@@ -248,17 +273,19 @@ else:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # [2-B] 내부 건조함 -> 제습기 OFF (전기 절약)
-        st.warning(f"⛔ 환기: 정지 (OFF)  |  ⚡ 제습기: 정지 (OFF)")
+        # [2-B] 내부 건조함 -> 환기 OFF / 유인휀 OFF / 제습기 OFF
+        # [수정] 유인휀 표시 추가 (절전 위해 정지)
+        st.warning(f"⛔ 환기: OFF  |  🌀 유인휀: OFF  |  ⚡ 제습기: OFF")
         st.markdown(f"""
         <div style="background-color:#fff3cd;padding:15px;border-radius:10px;">
             <b>[주의] 밀폐 유지 (전력 절감 모드)</b><br>
             <ul style="margin-bottom:5px;">
-                <li><b>메인 환기(급/배기)</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
+                <li><b>메인 환기</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
+                <li><b>유인휀</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡전력 절약</li>
                 <li><b>제습기</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡내부습도 {underground_hum:.0f}% (양호)</li>
             </ul>
             <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffeeba;">
-            - 외기는 습하지만 내부는 양호합니다. 굳이 제습기를 켤 필요 없습니다.
+            - 외기는 습하지만 내부는 양호합니다. 모든 장비를 멈추고 현상을 유지하십시오.
         </div>
         """, unsafe_allow_html=True)
 
