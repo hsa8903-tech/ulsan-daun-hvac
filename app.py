@@ -17,7 +17,6 @@ def get_base64_of_bin_file(bin_file):
 icon_file = "Lynn BI.png"
 page_icon = "🏗️" # 파일 없을 경우 기본값
 
-# favicon(브라우저 탭 아이콘) 설정
 if os.path.exists(icon_file):
     try:
         page_icon = Image.open(icon_file)
@@ -31,21 +30,15 @@ st.set_page_config(
 )
 
 # [핵심] 홈 화면 아이콘 강제 적용 (iOS/Android)
-# 이미지를 Base64로 변환하여 헤더에 직접 주입합니다.
 if os.path.exists(icon_file):
     icon_bin = get_base64_of_bin_file(icon_file)
-    # apple-touch-icon: 아이폰 홈 화면용
-    # shortcut icon: 안드로이드 및 PC용
     meta_tags = f"""
     <head>
         <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,{icon_bin}">
         <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,{icon_bin}">
         <link rel="icon" type="image/png" sizes="16x16" href="data:image/png;base64,{icon_bin}">
-        <link rel="manifest" href="data:application/manifest+json;base64,eyJkZXNjcmlwdGlvbiI6IiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2UvcG5nO2Jhc2U2NCx7aWNvbl9iaW59Iiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XSwibmFtZSI6IuyauOyCsOuLpOyatDFDaCDqsqTrHZzqtIDrpqZsIiwic2hvcnRfbmFtZSI6IuyauOyCsOuLpOyatCJ9">
     </head>
     """
-    # 주의: manifest는 base64 문자열이 너무 길면 잘릴 수 있습니다. 
-    # 가장 확실한 방법은 apple-touch-icon 태그입니다.
     st.markdown(meta_tags, unsafe_allow_html=True)
 
 
@@ -101,7 +94,7 @@ if 'e_temp' not in st.session_state: st.session_state['e_temp'] = default_e_temp
 if 'e_hum' not in st.session_state: st.session_state['e_hum'] = default_e_hum
 
 
-# --- 5. CSS 스타일 (다크모드 방지 + 배경) ---
+# --- 5. CSS 스타일 (버튼 가독성 개선 포함) ---
 bg_file = "bg.png"
 logo_file = "Lynn BI.png"
 bg_css = ""
@@ -123,7 +116,7 @@ if os.path.exists(bg_file):
 
 st.markdown(f"""
     <style>
-    /* 다크모드 강제 해제 (항상 밝은 테마) */
+    /* 1. 다크모드 강제 해제 (배경 흰색) */
     [data-testid="stAppViewContainer"] {{
         background-color: white !important;
         color: black !important;
@@ -134,12 +127,35 @@ st.markdown(f"""
     .stMarkdown, .stText, p, label, span, div {{
         color: #31333F; 
     }}
+    
+    /* 2. 숫자 입력창(Number Input) 스타일 강제 지정 */
+    /* 입력 필드 (흰 배경, 검은 글씨) */
     .stNumberInput input {{
         color: black !important;
         background-color: white !important;
+        border-color: #d6d6d8 !important;
     }}
     
-    /* 기본 스타일 */
+    /* [수정됨] 플러스(+), 마이너스(-) 버튼 스타일 */
+    /* 버튼 배경을 밝은 회색으로, 아이콘을 검은색으로 강제 */
+    div[data-testid="stNumberInput"] button {{
+        background-color: #f0f2f6 !important; /* 밝은 회색 배경 */
+        color: black !important;
+        border-color: #d6d6d8 !important;
+    }}
+    
+    /* 버튼 내부의 SVG 아이콘(화살표) 색상 강제 검정 */
+    div[data-testid="stNumberInput"] button svg {{
+        fill: black !important;
+        color: black !important;
+    }}
+    
+    /* 버튼 눌렀을 때(Active) 효과 */
+    div[data-testid="stNumberInput"] button:active {{
+        background-color: #e0e2e6 !important;
+    }}
+
+    /* 3. 기본 스타일 */
     [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
     {bg_css}
     input[type=number]::-webkit-inner-spin-button, 
