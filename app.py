@@ -23,19 +23,14 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. 초기값(Session State) 설정 ---
-if 'u_temp' not in st.session_state: st.session_state['u_temp'] = 18.5
-if 'u_hum' not in st.session_state: st.session_state['u_hum'] = 60.0
-if 'e_temp' not in st.session_state: st.session_state['e_temp'] = 25.0
-if 'e_hum' not in st.session_state: st.session_state['e_hum'] = 70.0
-
-# --- 3. 유틸리티 함수 ---
+# --- 2. 유틸리티 함수 ---
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
 def fetch_weather_data():
+    # 좌표: 울산다운2지구 우미린더시그니처
     lat = 35.5617
     lon = 129.2676
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
@@ -54,17 +49,44 @@ def get_weather_icon(code):
     elif code >= 80: return "⛈️"
     else: return "☁️"
 
+# [수정] 새로고침 콜백 (주소 표시 추가)
 def refresh_data_callback():
     new_data = fetch_weather_data()
     if new_data and 'current' in new_data:
         st.session_state['weather_data'] = new_data
+        
         api_temp = float(new_data['current']['temperature_2m'])
         api_hum = float(new_data['current']['relative_humidity_2m'])
+        
+        # 외부 날씨 값 강제 업데이트
         st.session_state['e_temp'] = api_temp
         st.session_state['e_hum'] = api_hum
-        st.toast(f"✅ 기상청 동기화 완료! (기온: {api_temp}℃, 습도: {api_hum}%)", icon="📡")
+        
+        # [수정] 주소 포함하여 토스트 메시지 출력
+        st.toast(f"✅ 동기화 완료! [울산 중구 다운동]\n(기온: {api_temp}℃, 습도: {api_hum}%)", icon="📡")
     else:
         st.toast("⚠️ 데이터를 불러오지 못했습니다.", icon="❌")
+
+# --- 3. 초기값(Session State) 설정 (자동 업데이트 로직) ---
+# 1) 먼저 날씨 데이터를 가져옵니다.
+if 'weather_data' not in st.session_state:
+    st.session_state['weather_data'] = fetch_weather_data()
+weather_data = st.session_state['weather_data']
+
+# 2) 가져온 데이터가 있으면 그걸 초기값으로, 없으면 기본값 사용
+default_e_temp = 25.0
+default_e_hum = 70.0
+
+if weather_data and 'current' in weather_data:
+    default_e_temp = float(weather_data['current']['temperature_2m'])
+    default_e_hum = float(weather_data['current']['relative_humidity_2m'])
+
+# 3) Session State 초기화 (여기서 외부 날씨가 자동 설정됨)
+if 'u_temp' not in st.session_state: st.session_state['u_temp'] = 18.5
+if 'u_hum' not in st.session_state: st.session_state['u_hum'] = 60.0
+if 'e_temp' not in st.session_state: st.session_state['e_temp'] = default_e_temp # API 값 적용
+if 'e_hum' not in st.session_state: st.session_state['e_hum'] = default_e_hum   # API 값 적용
+
 
 # --- 4. CSS 스타일 ---
 bg_file = "bg.png"
@@ -98,13 +120,7 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 
-# --- 5. 데이터 로딩 ---
-if 'weather_data' not in st.session_state:
-    st.session_state['weather_data'] = fetch_weather_data()
-weather_data = st.session_state['weather_data']
-
-
-# --- 6. 사이드바 ---
+# --- 5. 사이드바 ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
     st.info("""
@@ -118,19 +134,17 @@ with st.sidebar:
     
     if weather_data and 'daily' in weather_data:
         daily = weather_data['daily']
-        # 요일 리스트 정의
         weekdays = ["(월)", "(화)", "(수)", "(목)", "(금)", "(토)", "(일)"]
         
-        c1, c2, c3 = st.columns([1.3, 1.5, 1.4]) # [수정] 날짜 컬럼 너비 약간 확보
+        c1, c2, c3 = st.columns([1.3, 1.5, 1.4])
         c1.markdown("**날짜**")
         c2.markdown("**기온**")
         c3.markdown("**습도/강수**")
         
         for i in range(5):
-            # 날짜 객체 생성
             dt = datetime.strptime(daily['time'][i], "%Y-%m-%d")
             d_date = dt.strftime("%m/%d")
-            d_day = weekdays[dt.weekday()] # 요일 추출
+            d_day = weekdays[dt.weekday()]
             
             d_icon = get_weather_icon(daily['weather_code'][i])
             d_min = daily['temperature_2m_min'][i]
@@ -139,7 +153,6 @@ with st.sidebar:
             d_prob = daily['precipitation_probability_max'][i]
             
             cols = st.columns([1.3, 1.5, 1.4])
-            # [수정] 날짜+요일+아이콘 표시
             cols[0].write(f"{d_date}{d_day} {d_icon}")
             cols[1].write(f"{d_min:.1f}~{d_max:.1f}°")
             
@@ -153,8 +166,6 @@ with st.sidebar:
         st.error("데이터 수신 대기 중")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # 기상청 버튼 (파란색)
     st.markdown("""
     <a href="https://www.weather.go.kr/w/index.do" target="_blank" style="text-decoration:none; display:block; width:100%;">
         <div style="background-color:#0056b3; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
@@ -168,7 +179,7 @@ with st.sidebar:
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
 
-# --- 7. 메인 헤더 ---
+# --- 6. 메인 헤더 ---
 if os.path.exists(logo_file):
     logo_bin = get_base64_of_bin_file(logo_file)
     st.markdown(f"""
@@ -180,7 +191,6 @@ if os.path.exists(logo_file):
 else:
     st.title("Woomi Construction")
 
-# 메인 배너 (연노랑)
 st.markdown("""
 <div style="background-color: #fff9db; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #ffeeba;">
     <h1 style='margin:0; font-size: 2rem; color: #333;'>울산다운1차 결로 관리 시스템</h1>
@@ -190,7 +200,7 @@ st.markdown("""
 st.divider()
 
 
-# --- 8. 데이터 입력 ---
+# --- 7. 데이터 입력 ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -201,6 +211,7 @@ with col1:
 
 with col2:
     st.markdown("### ☁️ 외부 날씨")
+    # key가 설정되어 있으므로 session_state['e_temp'] 값이 초기화 시 바로 반영됨
     st.number_input("현재 기온 (℃)", step=0.1, format="%.1f", key='e_temp')
     st.number_input("현재 습도 (%)", step=0.5, format="%.1f", key='e_hum')
     
@@ -213,7 +224,7 @@ ext_temp = st.session_state['e_temp']
 ext_hum = st.session_state['e_hum']
 
 
-# --- 9. 판정 로직 ---
+# --- 8. 판정 로직 ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -284,7 +295,7 @@ else:
         """, unsafe_allow_html=True)
 
 
-# --- 10. 내일 예보 ---
+# --- 9. 내일 예보 ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
