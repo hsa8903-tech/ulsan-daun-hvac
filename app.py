@@ -7,7 +7,13 @@ import base64
 import os
 from PIL import Image
 
-# --- 1. 앱 기본 설정 ---
+# --- 1. 유틸리티 함수 (맨 위로 이동) ---
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# --- 2. 앱 기본 설정 ---
 icon_file = "Lynn BI.png"
 page_icon = "🏗️" # 기본값
 
@@ -23,12 +29,20 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. 유틸리티 함수 ---
-def get_base64_of_bin_file(bin_file):
-    with open(bin_file, 'rb') as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
+# [핵심] 아이폰/안드로이드 홈화면 아이콘 강제 주입 코드
+if os.path.exists(icon_file):
+    icon_bin = get_base64_of_bin_file(icon_file)
+    # HTML 헤더에 강제로 아이콘 링크를 심습니다.
+    meta_tags = f"""
+    <head>
+        <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,{icon_bin}">
+        <link rel="icon" type="image/png" href="data:image/png;base64,{icon_bin}">
+    </head>
+    """
+    st.markdown(meta_tags, unsafe_allow_html=True)
 
+
+# --- 3. 날씨 데이터 함수 ---
 def fetch_weather_data():
     # 좌표: 울산다운2지구 우미린 더 시그니처 (범서읍 서사리 일원)
     lat = 35.5835
@@ -63,7 +77,7 @@ def refresh_data_callback():
     else:
         st.toast("⚠️ 데이터를 불러오지 못했습니다.", icon="❌")
 
-# --- 3. 초기값(Session State) 설정 ---
+# --- 4. 초기값(Session State) 설정 ---
 if 'weather_data' not in st.session_state:
     st.session_state['weather_data'] = fetch_weather_data()
 weather_data = st.session_state['weather_data']
@@ -81,7 +95,7 @@ if 'e_temp' not in st.session_state: st.session_state['e_temp'] = default_e_temp
 if 'e_hum' not in st.session_state: st.session_state['e_hum'] = default_e_hum
 
 
-# --- 4. CSS 스타일 (다크모드 방지 포함) ---
+# --- 5. CSS 스타일 (다크모드 방지 + 배경) ---
 bg_file = "bg.png"
 logo_file = "Lynn BI.png"
 bg_css = ""
@@ -103,7 +117,7 @@ if os.path.exists(bg_file):
 
 st.markdown(f"""
     <style>
-    /* [핵심] 다크모드 강제 해제 (항상 밝은 테마 유지) */
+    /* 다크모드 강제 해제 */
     [data-testid="stAppViewContainer"] {{
         background-color: white !important;
         color: black !important;
@@ -111,17 +125,15 @@ st.markdown(f"""
     [data-testid="stSidebar"] {{
         background-color: #f0f2f6 !important;
     }}
-    /* 위젯 라벨 및 기본 텍스트 색상 강제 지정 (검정) */
     .stMarkdown, .stText, p, label, span, div {{
-        color: #31333F; /* Streamlit 기본 검정색 */
+        color: #31333F; 
     }}
-    /* 입력창 배경 밝게 */
     .stNumberInput input {{
         color: black !important;
         background-color: white !important;
     }}
     
-    /* 기존 스타일 유지 */
+    /* 기본 스타일 */
     [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
     {bg_css}
     input[type=number]::-webkit-inner-spin-button, 
@@ -132,7 +144,7 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 
-# --- 5. 사이드바 ---
+# --- 6. 사이드바 ---
 with st.sidebar:
     st.header("🏗️ 현장 개요")
     st.info("""
@@ -191,7 +203,7 @@ with st.sidebar:
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
 
-# --- 6. 메인 헤더 ---
+# --- 7. 메인 헤더 ---
 if os.path.exists(logo_file):
     logo_bin = get_base64_of_bin_file(logo_file)
     st.markdown(f"""
@@ -212,7 +224,7 @@ st.markdown("""
 st.divider()
 
 
-# --- 7. 데이터 입력 ---
+# --- 8. 데이터 입력 ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -235,7 +247,7 @@ ext_temp = st.session_state['e_temp']
 ext_hum = st.session_state['e_hum']
 
 
-# --- 8. 판정 로직 ---
+# --- 9. 판정 로직 ---
 def calculate_dew_point(temp, hum):
     b, c = 17.62, 243.12
     gamma = (b * temp / (c + temp)) + math.log(hum / 100.0)
@@ -306,7 +318,7 @@ else:
         """, unsafe_allow_html=True)
 
 
-# --- 9. 내일 예보 ---
+# --- 10. 내일 예보 ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
