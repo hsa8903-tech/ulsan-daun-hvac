@@ -30,8 +30,7 @@ def get_base64_of_bin_file(bin_file):
     return base64.b64encode(data).decode()
 
 def fetch_weather_data():
-    # [수정] 좌표 정밀 보정: 울산다운2지구 우미린 더 시그니처 (범서읍 서사리 일원)
-    # 기존(다운동): 35.5617, 129.2676 -> 수정(서사리): 35.5835, 129.2435
+    # 좌표: 울산다운2지구 우미린 더 시그니처 (범서읍 서사리 일원)
     lat = 35.5835
     lon = 129.2435
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
@@ -50,19 +49,16 @@ def get_weather_icon(code):
     elif code >= 80: return "⛈️"
     else: return "☁️"
 
-# 새로고침 콜백
 def refresh_data_callback():
     new_data = fetch_weather_data()
     if new_data and 'current' in new_data:
         st.session_state['weather_data'] = new_data
-        
         api_temp = float(new_data['current']['temperature_2m'])
         api_hum = float(new_data['current']['relative_humidity_2m'])
         
         st.session_state['e_temp'] = api_temp
         st.session_state['e_hum'] = api_hum
         
-        # [수정] 주소 명칭 확정
         st.toast(f"✅ 동기화 완료! [울산다운2지구 우미린더시그니처]\n(기온: {api_temp}℃, 습도: {api_hum}%)", icon="📡")
     else:
         st.toast("⚠️ 데이터를 불러오지 못했습니다.", icon="❌")
@@ -85,7 +81,7 @@ if 'e_temp' not in st.session_state: st.session_state['e_temp'] = default_e_temp
 if 'e_hum' not in st.session_state: st.session_state['e_hum'] = default_e_hum
 
 
-# --- 4. CSS 스타일 ---
+# --- 4. CSS 스타일 (다크모드 방지 포함) ---
 bg_file = "bg.png"
 logo_file = "Lynn BI.png"
 bg_css = ""
@@ -107,6 +103,25 @@ if os.path.exists(bg_file):
 
 st.markdown(f"""
     <style>
+    /* [핵심] 다크모드 강제 해제 (항상 밝은 테마 유지) */
+    [data-testid="stAppViewContainer"] {{
+        background-color: white !important;
+        color: black !important;
+    }}
+    [data-testid="stSidebar"] {{
+        background-color: #f0f2f6 !important;
+    }}
+    /* 위젯 라벨 및 기본 텍스트 색상 강제 지정 (검정) */
+    .stMarkdown, .stText, p, label, span, div {{
+        color: #31333F; /* Streamlit 기본 검정색 */
+    }}
+    /* 입력창 배경 밝게 */
+    .stNumberInput input {{
+        color: black !important;
+        background-color: white !important;
+    }}
+    
+    /* 기존 스타일 유지 */
     [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
     {bg_css}
     input[type=number]::-webkit-inner-spin-button, 
@@ -247,14 +262,14 @@ if is_vent_safe:
     st.success(f"✅ 환기: ON  |  🌀 유인휀: ON  |  ⚡ 제습기: OFF")
     st.markdown(f"""
     <div style="{box_safe}">
-        <b>[안전] 적극 환기 (에너지 절약)</b><br>
-        <ul style="margin-bottom:5px;">
+        <b style="color:#333;">[안전] 적극 환기 (에너지 절약)</b><br>
+        <ul style="margin-bottom:5px; color:#333;">
             <li><b>메인 환기</b>: <span style="color:green; font-weight:bold;">ON (가동)</span> - 외기로 건조</li>
             <li><b>유인휀</b>: <span style="color:green; font-weight:bold;">ON (가동)</span> - 공기 순환</li>
             <li><b>제습기</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡전력 절약</li>
         </ul>
         <hr style="margin:10px 0; border: 0; border-top: 1px solid #b3e6c9;">
-        - 외기 이슬점({ext_dew_point}℃)이 낮아 환기만으로 충분합니다.
+        <span style="color:#333;">- 외기 이슬점({ext_dew_point}℃)이 낮아 환기만으로 충분합니다.</span>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -264,14 +279,14 @@ else:
         st.error(f"⛔ 환기: OFF  |  🌀 유인휀: ON  |  💧 제습기: ON")
         st.markdown(f"""
         <div style="{box_danger}">
-            <b>[위험] 밀폐 및 강제 제습</b><br>
-            <ul style="margin-bottom:5px;">
+            <b style="color:#333;">[위험] 밀폐 및 강제 제습</b><br>
+            <ul style="margin-bottom:5px; color:#333;">
                 <li><b>메인 환기</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
                 <li><b>유인휀</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 제습 효율 증대</li>
                 <li><b>제습기</b>: <span style="color:blue; font-weight:bold;">ON (가동)</span> - 내부습도 {underground_hum:.1f}% (높음)</li>
             </ul>
             <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffcccc;">
-            - 외기 유입 시 결로가 발생하며, 내부도 습하므로 기계 제습이 필요합니다.
+            <span style="color:#333;">- 외기 유입 시 결로가 발생하며, 내부도 습하므로 기계 제습이 필요합니다.</span>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -279,14 +294,14 @@ else:
         st.warning(f"⛔ 환기: OFF  |  🌀 유인휀: OFF  |  ⚡ 제습기: OFF")
         st.markdown(f"""
         <div style="{box_warn}">
-            <b>[주의] 밀폐 유지 (전력 절감 모드)</b><br>
-            <ul style="margin-bottom:5px;">
+            <b style="color:#333;">[주의] 밀폐 유지 (전력 절감 모드)</b><br>
+            <ul style="margin-bottom:5px; color:#333;">
                 <li><b>메인 환기</b>: <span style="color:red; font-weight:bold;">OFF (밀폐)</span> - 습한 외기 차단</li>
                 <li><b>유인휀</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡전력 절약</li>
                 <li><b>제습기</b>: <span style="color:gray; font-weight:bold;">OFF (정지)</span> - ⚡내부습도 {underground_hum:.1f}% (양호)</li>
             </ul>
             <hr style="margin:10px 0; border: 0; border-top: 1px solid #ffeeba;">
-            - 외기는 습하지만 내부는 양호합니다. 모든 장비를 멈추고 현상을 유지하십시오.
+            <span style="color:#333;">- 외기는 습하지만 내부는 양호합니다. 모든 장비를 멈추고 현상을 유지하십시오.</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -307,13 +322,13 @@ if weather_data and 'daily' in weather_data:
         st.markdown(f"""
         <div style="{box_forecast}">
             <strong style="color:#0056b3;">내일 예상</strong><br><br>
-            최고: <b>{t_max:.1f}℃</b><br>습도: <b>{t_hum:.1f}%</b><br>강수: <b>{t_prob:.0f}%</b><br>이슬점: <b>{t_dew:.1f}℃</b>
+            <span style="color:#333;">최고: <b>{t_max:.1f}℃</b><br>습도: <b>{t_hum:.1f}%</b><br>강수: <b>{t_prob:.0f}%</b><br>이슬점: <b>{t_dew:.1f}℃</b></span>
         </div>""", unsafe_allow_html=True)
     with c2:
         if t_dew >= (underground_temp - safety_margin):
-            st.markdown(f"<div style='{box_forecast} border-left: 5px solid #ffc107;'><strong style='color:#d39e00;'>⚠️ 내일도 '환기 주의' 예상</strong><br><br>내일도 습하거나 비 소식이 있을 수 있습니다.<br>지하 온도를 확인하며 밀폐 관리를 유지하세요.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='{box_forecast} border-left: 5px solid #ffc107;'><strong style='color:#d39e00;'>⚠️ 내일도 '환기 주의' 예상</strong><br><br><span style='color:#333;'>내일도 습하거나 비 소식이 있을 수 있습니다.<br>지하 온도를 확인하며 밀폐 관리를 유지하세요.</span></div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div style='{box_forecast} border-left: 5px solid #17a2b8;'><strong style='color:#138496;'>🆗 내일은 '적극 환기' 가능</strong><br><br>내일은 비교적 건조할 것으로 예상됩니다.<br>오전부터 적극적으로 환기하여 지하를 말리십시오.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='{box_forecast} border-left: 5px solid #17a2b8;'><strong style='color:#138496;'>🆗 내일은 '적극 환기' 가능</strong><br><br><span style='color:#333;'>내일은 비교적 건조할 것으로 예상됩니다.<br>오전부터 적극적으로 환기하여 지하를 말리십시오.</span></div>", unsafe_allow_html=True)
 
 st.divider()
 st.caption("우미건설(주) 울산다운1차 현장 설비팀")
