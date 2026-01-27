@@ -7,16 +7,17 @@ import base64
 import os
 from PIL import Image
 
-# --- 1. 유틸리티 함수 (맨 위로 이동) ---
+# --- 1. 유틸리티 함수 ---
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-# --- 2. 앱 기본 설정 ---
+# --- 2. 앱 기본 설정 & 아이콘 로딩 ---
 icon_file = "Lynn BI.png"
-page_icon = "🏗️" # 기본값
+page_icon = "🏗️" # 파일 없을 경우 기본값
 
+# favicon(브라우저 탭 아이콘) 설정
 if os.path.exists(icon_file):
     try:
         page_icon = Image.open(icon_file)
@@ -29,22 +30,27 @@ st.set_page_config(
     layout="centered"
 )
 
-# [핵심] 아이폰/안드로이드 홈화면 아이콘 강제 주입 코드
+# [핵심] 홈 화면 아이콘 강제 적용 (iOS/Android)
+# 이미지를 Base64로 변환하여 헤더에 직접 주입합니다.
 if os.path.exists(icon_file):
     icon_bin = get_base64_of_bin_file(icon_file)
-    # HTML 헤더에 강제로 아이콘 링크를 심습니다.
+    # apple-touch-icon: 아이폰 홈 화면용
+    # shortcut icon: 안드로이드 및 PC용
     meta_tags = f"""
     <head>
         <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,{icon_bin}">
-        <link rel="icon" type="image/png" href="data:image/png;base64,{icon_bin}">
+        <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,{icon_bin}">
+        <link rel="icon" type="image/png" sizes="16x16" href="data:image/png;base64,{icon_bin}">
+        <link rel="manifest" href="data:application/manifest+json;base64,eyJkZXNjcmlwdGlvbiI6IiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2UvcG5nO2Jhc2U2NCx7aWNvbl9iaW59Iiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XSwibmFtZSI6IuyauOyCsOuLpOyatDFDaCDqsqTrHZzqtIDrpqZsIiwic2hvcnRfbmFtZSI6IuyauOyCsOuLpOyatCJ9">
     </head>
     """
+    # 주의: manifest는 base64 문자열이 너무 길면 잘릴 수 있습니다. 
+    # 가장 확실한 방법은 apple-touch-icon 태그입니다.
     st.markdown(meta_tags, unsafe_allow_html=True)
 
 
-# --- 3. 날씨 데이터 함수 ---
+# --- 3. 날씨 데이터 함수 (좌표: 울산다운2지구 서사리) ---
 def fetch_weather_data():
-    # 좌표: 울산다운2지구 우미린 더 시그니처 (범서읍 서사리 일원)
     lat = 35.5835
     lon = 129.2435
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,precipitation_probability_max&timezone=Asia%2FTokyo"
@@ -117,7 +123,7 @@ if os.path.exists(bg_file):
 
 st.markdown(f"""
     <style>
-    /* 다크모드 강제 해제 */
+    /* 다크모드 강제 해제 (항상 밝은 테마) */
     [data-testid="stAppViewContainer"] {{
         background-color: white !important;
         color: black !important;
