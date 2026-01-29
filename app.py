@@ -1,7 +1,7 @@
 import streamlit as st
 import math
 import requests
-from datetime import datetime
+import datetime # [수정] 날짜 모듈 전체를 import하여 충돌 방지
 import pytz
 import base64
 import os
@@ -15,7 +15,7 @@ def get_base64_of_bin_file(bin_file):
 
 # --- 2. 앱 기본 설정 & 아이콘 로딩 ---
 icon_file = "Lynn BI.png"
-page_icon = "🏗️" # 파일 없을 경우 기본값
+page_icon = "🏗️" 
 
 if os.path.exists(icon_file):
     try:
@@ -116,7 +116,7 @@ if os.path.exists(bg_file):
 
 st.markdown(f"""
     <style>
-    /* 1. [핵심] 다크모드 시스템 설정 무시 및 강제 화이트 모드 적용 */
+    /* 다크모드 시스템 설정 무시 */
     :root {{
         --primary-color: #ff4b4b;
         --background-color: #ffffff;
@@ -125,33 +125,25 @@ st.markdown(f"""
         --font: sans-serif;
     }}
     
-    /* 앱 전체 배경 강제 흰색 */
     [data-testid="stAppViewContainer"] {{
         background-color: #ffffff !important;
         color: #31333F !important;
     }}
-    
-    /* 사이드바 배경 강제 밝은 회색 */
     [data-testid="stSidebar"] {{
         background-color: #f0f2f6 !important;
     }}
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {{
-        color: #31333F !important;
-    }}
-
-    /* 모든 텍스트 색상 강제 검정 (다크모드에서 흰색으로 변하는 것 방지) */
+    
+    /* 텍스트 색상 강제 검정 */
     h1, h2, h3, h4, h5, h6, p, label, span, div {{
         color: #31333F !important;
     }}
 
-    /* 2. 숫자 입력창(Number Input) 스타일 */
+    /* 숫자 입력창 스타일 */
     .stNumberInput input {{
         color: black !important;
         background-color: white !important;
         border-color: #d6d6d8 !important;
     }}
-    
-    /* + - 버튼 스타일 */
     div[data-testid="stNumberInput"] button {{
         background-color: #f0f2f6 !important; 
         color: black !important;
@@ -161,7 +153,7 @@ st.markdown(f"""
         fill: black !important;
     }}
     
-    /* 3. 기본 스타일 */
+    /* 기본 스타일 */
     [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
     {bg_css}
     input[type=number]::-webkit-inner-spin-button, 
@@ -194,7 +186,10 @@ with st.sidebar:
         c3.markdown("**습도/강수**")
         
         for i in range(5):
-            dt = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d")
+            # [수정] datetime 모듈 명시적 사용 (에러 해결 핵심)
+            date_str = daily['time'][i]
+            dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+            
             d_date = dt.strftime("%m/%d")
             d_day = weekdays[dt.weekday()]
             
@@ -227,7 +222,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     st.divider()
-    now = datetime.now(pytz.timezone('Asia/Seoul'))
+    now = datetime.datetime.now(pytz.timezone('Asia/Seoul'))
     st.caption(f"Update: {now.strftime('%Y-%m-%d %H:%M')}")
 
 
