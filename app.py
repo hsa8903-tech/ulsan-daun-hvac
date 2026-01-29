@@ -29,7 +29,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# [핵심] 홈 화면 아이콘 강제 적용 (iOS/Android)
+# [핵심] 홈 화면 아이콘 강제 적용
 if os.path.exists(icon_file):
     icon_bin = get_base64_of_bin_file(icon_file)
     meta_tags = f"""
@@ -94,7 +94,7 @@ if 'e_temp' not in st.session_state: st.session_state['e_temp'] = default_e_temp
 if 'e_hum' not in st.session_state: st.session_state['e_hum'] = default_e_hum
 
 
-# --- 5. CSS 스타일 (버튼 가독성 개선 포함) ---
+# --- 5. CSS 스타일 (다크모드 완벽 차단) ---
 bg_file = "bg.png"
 logo_file = "Lynn BI.png"
 bg_css = ""
@@ -116,45 +116,51 @@ if os.path.exists(bg_file):
 
 st.markdown(f"""
     <style>
-    /* 1. 다크모드 강제 해제 (배경 흰색) */
-    [data-testid="stAppViewContainer"] {{
-        background-color: white !important;
-        color: black !important;
+    /* 1. [핵심] 다크모드 시스템 설정 무시 및 강제 화이트 모드 적용 */
+    :root {{
+        --primary-color: #ff4b4b;
+        --background-color: #ffffff;
+        --secondary-background-color: #f0f2f6;
+        --text-color: #31333F;
+        --font: sans-serif;
     }}
+    
+    /* 앱 전체 배경 강제 흰색 */
+    [data-testid="stAppViewContainer"] {{
+        background-color: #ffffff !important;
+        color: #31333F !important;
+    }}
+    
+    /* 사이드바 배경 강제 밝은 회색 */
     [data-testid="stSidebar"] {{
         background-color: #f0f2f6 !important;
     }}
-    .stMarkdown, .stText, p, label, span, div {{
-        color: #31333F; 
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {{
+        color: #31333F !important;
     }}
-    
-    /* 2. 숫자 입력창(Number Input) 스타일 강제 지정 */
-    /* 입력 필드 (흰 배경, 검은 글씨) */
+
+    /* 모든 텍스트 색상 강제 검정 (다크모드에서 흰색으로 변하는 것 방지) */
+    h1, h2, h3, h4, h5, h6, p, label, span, div {{
+        color: #31333F !important;
+    }}
+
+    /* 2. 숫자 입력창(Number Input) 스타일 */
     .stNumberInput input {{
         color: black !important;
         background-color: white !important;
         border-color: #d6d6d8 !important;
     }}
     
-    /* [수정됨] 플러스(+), 마이너스(-) 버튼 스타일 */
-    /* 버튼 배경을 밝은 회색으로, 아이콘을 검은색으로 강제 */
+    /* + - 버튼 스타일 */
     div[data-testid="stNumberInput"] button {{
-        background-color: #f0f2f6 !important; /* 밝은 회색 배경 */
+        background-color: #f0f2f6 !important; 
         color: black !important;
         border-color: #d6d6d8 !important;
     }}
-    
-    /* 버튼 내부의 SVG 아이콘(화살표) 색상 강제 검정 */
     div[data-testid="stNumberInput"] button svg {{
         fill: black !important;
-        color: black !important;
     }}
     
-    /* 버튼 눌렀을 때(Active) 효과 */
-    div[data-testid="stNumberInput"] button:active {{
-        background-color: #e0e2e6 !important;
-    }}
-
     /* 3. 기본 스타일 */
     [data-testid="stAppViewContainer"] > .main {{ position: relative; }}
     {bg_css}
@@ -188,7 +194,7 @@ with st.sidebar:
         c3.markdown("**습도/강수**")
         
         for i in range(5):
-            dt = datetime.strptime(daily['time'][i], "%Y-%m-%d")
+            dt = datetime.strptime(daily['time'][i], "%Y-%m-%d").strftime("%m/%d")
             d_date = dt.strftime("%m/%d")
             d_day = weekdays[dt.weekday()]
             
