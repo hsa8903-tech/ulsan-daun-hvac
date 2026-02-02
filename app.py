@@ -1,7 +1,7 @@
 import streamlit as st
 import math
 import requests
-import datetime # [수정] 날짜 모듈 전체를 import하여 충돌 방지
+import datetime
 import pytz
 import base64
 import os
@@ -133,7 +133,6 @@ st.markdown(f"""
         background-color: #f0f2f6 !important;
     }}
     
-    /* 텍스트 색상 강제 검정 */
     h1, h2, h3, h4, h5, h6, p, label, span, div {{
         color: #31333F !important;
     }}
@@ -186,7 +185,6 @@ with st.sidebar:
         c3.markdown("**습도/강수**")
         
         for i in range(5):
-            # [수정] datetime 모듈 명시적 사용 (에러 해결 핵심)
             date_str = daily['time'][i]
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             
@@ -341,10 +339,11 @@ else:
         """, unsafe_allow_html=True)
 
 
-# --- 10. 내일 예보 ---
+# --- 10. 내일 예보 (최저/최고 기온 포함) ---
 st.divider()
 st.subheader("🔮 내일(익일) 환기 예보")
 if weather_data and 'daily' in weather_data:
+    t_min = weather_data['daily']['temperature_2m_min'][1] # [추가] 내일 최저
     t_max = weather_data['daily']['temperature_2m_max'][1]
     t_hum = weather_data['daily']['relative_humidity_2m_mean'][1]
     t_prob = weather_data['daily']['precipitation_probability_max'][1]
@@ -357,7 +356,7 @@ if weather_data and 'daily' in weather_data:
         st.markdown(f"""
         <div style="{box_forecast}">
             <strong style="color:#0056b3;">내일 예상</strong><br><br>
-            <span style="color:#333;">최고: <b>{t_max:.1f}℃</b><br>습도: <b>{t_hum:.1f}%</b><br>강수: <b>{t_prob:.0f}%</b><br>이슬점: <b>{t_dew:.1f}℃</b></span>
+            <span style="color:#333;">최저: <b>{t_min:.1f}℃</b><br>최고: <b>{t_max:.1f}℃</b><br>습도: <b>{t_hum:.1f}%</b><br>강수: <b>{t_prob:.0f}%</b><br>이슬점: <b>{t_dew:.1f}℃</b></span>
         </div>""", unsafe_allow_html=True)
     with c2:
         if t_dew >= (underground_temp - safety_margin):
